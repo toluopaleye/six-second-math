@@ -25,6 +25,34 @@ const LEVEL_DESC = {
   3: 'Four-digit sums, two-digit × two-digit, thousandths and awkward denominators.',
 };
 
+// ---------------------------------------------------------------- study plan
+// Whole numbers, then decimals, then fractions: each operation at Foundations then Test level, with a mixed
+// round after every new operation, then conversions, then everything mixed. A stage is passed with PLAN_N answers
+// in it, a median at or under the goal on the right ones, and at least 90% right. Only the last PLAN_N count.
+const PLAN_N = 30;
+const LEVEL_NAME = { 1: 'Foundations', 2: 'Test level', 3: 'Hard' };
+const OP_WORD = { add: 'addition', sub: 'subtraction', mul: 'multiplication', div: 'division' };
+const ALL_CELLS = OPS.flatMap(o => TYPES.map(t => o + '.' + t)).concat('conv.frac');
+const PLAN = (() => {
+  const out = [];
+  const add = (id, group, title, cells, level, missing) => out.push({ id, group, title, cells, level, missing: !!missing });
+  for (const [t, ops] of [['whole', OPS], ['dec', OPS], ['frac', ['mul', 'div', 'add', 'sub']]]) {
+    const group = TYPE_NAME[t], sofar = [];
+    for (const op of ops) {
+      add(`${t}.${op}.1`, group, `${OP_SYM[op]} ${group}`, [op + '.' + t], 1);
+      add(`${t}.${op}.2`, group, `${OP_SYM[op]} ${group}`, [op + '.' + t], 2);
+      sofar.push(op);
+      if (sofar.length > 1) add(`${t}.mix${sofar.length}`, group, `Mixed ${sofar.map(o => OP_SYM[o]).join(' ')} ${group.toLowerCase()}`, sofar.map(o => o + '.' + t), 2);
+    }
+  }
+  add('conv.1', 'Fractions', 'Fraction ⇄ decimal', ['conv.frac'], 1);
+  add('conv.2', 'Fractions', 'Fraction ⇄ decimal', ['conv.frac'], 2);
+  add('all.2', 'Everything', 'Everything mixed', ALL_CELLS, 2);
+  add('all.miss', 'Everything', 'Everything, with missing numbers', ALL_CELLS, 2, true);
+  return out;
+})();
+const WEEKLY_TEST = { cells: ALL_CELLS, level: 2, missing: true, min: 8 };
+
 // ---------------------------------------------------------------- state
 const LS_KEY = 'six-second-math:v1';
 function defaults() {
@@ -32,6 +60,7 @@ function defaults() {
     v: 1, updatedAt: 0,
     settings: { ops: { add: true, sub: true, mul: true, div: true }, types: { whole: true, dec: true, frac: true }, conv: true, missing: false, level: 2, start: 10, goal: 6, hard: false, adaptive: true, testMin: 8, practiceMin: 0 },
     target: 10, win: [], cells: {}, tests: [], totals: { n: 0, f: 0 }, bestStreak: 0, hist: '',
+    plan: { on: false, active: '', done: {}, rec: {} },
   };
 }
 function merge(base, src) {
@@ -64,6 +93,13 @@ function sanitize() {
   S.win = (Array.isArray(S.win) ? S.win : []).filter(x => x === 'f' || x === 's' || x === 'm').slice(-10);
   if (S.tests.length > 60) S.tests = S.tests.slice(-60);
   if (typeof S.hist !== 'string') S.hist = '';
+  const pl = S.plan;
+  if (typeof pl.active !== 'string' || (pl.active && planIndex(pl.active) < 0)) pl.active = '';
+  for (const k of Object.keys(pl.done)) if (planIndex(k) < 0 || !pl.done[k] || typeof pl.done[k] !== 'object') delete pl.done[k];
+  for (const k of Object.keys(pl.rec)) {
+    if (planIndex(k) < 0 || !Array.isArray(pl.rec[k])) delete pl.rec[k];
+    else pl.rec[k] = pl.rec[k].filter(r => Array.isArray(r) && typeof r[0] === 'number' && (r[1] === 0 || r[1] === 1)).slice(-PLAN_N);
+  }
 }
 
 // ---------------------------------------------------------------- saving progress
@@ -171,18 +207,32 @@ const RT = {
   view: 'practice', mode: 'practice', state: 'ready', prob: null, input: '', qTarget: 10, qid: 0,
   t0: 0, pausedMs: 0, pauseAt: 0, queue: [], recent: [], tally: [], streak: 0, isRetry: false,
   drill: null, fbReadyAt: 0, test: null, testView: 'setup', raf: 0, storage: 'none', topicsDirty: false, hintWarn: false,
-  sess: null, holdUser: false, holdSys: false, sessClockTxt: '',
+  sess: null, holdUser: false, holdSys: false, sessClockTxt: '', testCfg: null,
 };
 
 // ---------------------------------------------------------------- choosing questions
 function cellName(id) { const [op, t] = id.split('.'); return op === 'conv' ? 'Conversions' : TYPE_NAME[t]; }
 function cellShort(id) { const op = id.split('.')[0]; return op === 'conv' ? 'Fraction ⇄ decimal' : OP_SYM[op] + ' ' + cellName(id); }
+// What questions come from: a weekly-check test, a drilled topic, the study plan's stage, or Settings.
 function activeCells() {
+  if (RT.mode === 'test' && RT.testCfg) return RT.testCfg.cells;
   if (RT.drill) return [RT.drill];
+  const stg = planStage();
+  if (stg) return stg.cells;
   const st = S.settings, out = [];
   for (const op of OPS) if (st.ops[op]) for (const t of TYPES) if (st.types[t]) out.push(op + '.' + t);
   if (st.types.frac && st.conv) out.push('conv.frac');
   return out.length ? out : ['add.whole'];
+}
+function topicLevel() {
+  if (RT.mode === 'test') return RT.testCfg ? RT.testCfg.level : S.settings.level;
+  const stg = planStage();
+  return stg ? stg.level : S.settings.level;
+}
+function topicMissing() {
+  if (RT.mode === 'test') return RT.testCfg ? RT.testCfg.missing : S.settings.missing;
+  const stg = planStage();
+  return stg ? stg.missing : S.settings.missing;
 }
 function weakness(id) {
   const c = S.cells[id];
@@ -202,7 +252,7 @@ function freshProblem() {
   let last = null;
   for (let i = 0; i < 10; i++) {
     let p;
-    try { p = MM.generate(pickCell(), S.settings.level, S.settings.missing ? 0.3 : 0); } catch (e) { console.error(e); continue; }
+    try { p = MM.generate(pickCell(), topicLevel(), topicMissing() ? 0.3 : 0); } catch (e) { console.error(e); continue; }
     last = p;
     if (!RT.recent.includes(p.key)) break;
   }
@@ -458,6 +508,7 @@ function skip() {
   record(RT.prob, 'm', secs); updateScore(); nextQuestion();
 }
 function record(p, kind, secs) {
+  let passed = false;
   const c = S.cells[p.cell] || (S.cells[p.cell] = { n: 0, f: 0, s: 0, m: 0, rec: [] });
   c.n++; c[kind]++;
   c.rec.push([Math.round(secs * 10) / 10, kind === 'f' ? 0 : kind === 's' ? 1 : 2]);
@@ -471,8 +522,15 @@ function record(p, kind, secs) {
     adapt(kind);
     const ss = RT.sess;
     if (ss && ss.running) { ss.n++; ss[kind]++; if (kind !== 'm') ss.times.push(secs); }
+    const stg = planStage();
+    if (stg && stg.cells.includes(p.cell) && p.level === stg.level) {
+      const r = S.plan.rec[stg.id] || (S.plan.rec[stg.id] = []);
+      r.push([Math.round(secs * 10) / 10, kind === 'm' ? 0 : 1]);
+      if (r.length > PLAN_N) r.splice(0, r.length - PLAN_N);
+      if (!planDone(stg.id) && stageStats(stg).pass) { passStage(stg, false); passed = true; }
+    }
   }
-  renderStatus(); touch(false);
+  renderStatus(); touch(passed);
 }
 function adapt(kind) {
   const st = S.settings;
@@ -653,6 +711,7 @@ function renderSummary(ss, used, stopped) {
   box.innerHTML = `<span class="eyebrow">Session · ${esc(len)}</span>
     <div class="result-hero"><span class="big">${n}</span><span class="unit">answered${n ? ' · ' + Math.round(100 * ss.f / n) + '% fast' : ''}</span></div>
     <p>${esc(tgt)}</p>
+    ${ss.passed && ss.passed.length ? `<p class="sum-plan">${G.f}<span>Study plan: you passed ${ss.passed.map(esc).join(', ')}.</span></p>` : ''}
     <div class="kpis">${k(G.f, 'Fast', ss.f)}${k(G.s, 'Slow', ss.s)}${k(G.m, 'Missed', ss.m)}${k('', 'Median', med == null ? '–' : med.toFixed(1) + 's', 'on right answers')}</div>
     <div class="btn-row"><button type="button" class="btn primary" id="btnSessAgain">Go again</button><button type="button" class="btn" id="btnSessDone">Done</button></div>`;
   $('#btnSessAgain').addEventListener('click', () => startPractice());
@@ -661,6 +720,134 @@ function renderSummary(ss, used, stopped) {
     const r = box.getBoundingClientRect();
     if (r.top < 0 || r.bottom > window.innerHeight) box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   });
+}
+
+// ---------------------------------------------------------------- study plan
+function planIndex(id) { return PLAN.findIndex(s => s.id === id); }
+function planDone(id) { return !!S.plan.done[id]; }
+function planFirstOpen(from) {
+  for (let i = from; i < PLAN.length; i++) if (!planDone(PLAN[i].id)) return PLAN[i];
+  for (let i = 0; i < from; i++) if (!planDone(PLAN[i].id)) return PLAN[i];
+  return null;
+}
+function planActive() { const i = planIndex(S.plan.active); return i >= 0 ? PLAN[i] : (planFirstOpen(0) || PLAN[PLAN.length - 1]); }
+function planComplete() { return PLAN.every(s => planDone(s.id)); }
+// The stage practice is drawing from right now (none while drilling a topic, in a test, or with the plan off).
+function planStage() { return S.plan.on && RT.mode === 'practice' && !RT.drill ? planActive() : null; }
+function stageLabel(stg) { return stg.title + ' · ' + LEVEL_NAME[stg.level]; }
+function levelWords(L) { return L === 1 ? 'Foundations level' : 'Test level'; }
+function stageDesc(stg) {
+  if (stg.cells.length === ALL_CELLS.length) return `Every operation with whole numbers, decimals and fractions, plus conversions, at Test level${stg.missing ? ', with some missing-number questions like 66 × ? = 138.6' : ''}. This is the real test.`;
+  if (stg.cells[0] === 'conv.frac') return `Turning fractions into decimals and back, like 3/8 = 0.375, at ${levelWords(stg.level)}.`;
+  const type = stg.cells[0].split('.')[1], w = stg.cells.map(c => OP_WORD[c.split('.')[0]]);
+  const list = w.length === 1 ? w[0] : w.slice(0, -1).join(', ') + ' and ' + w[w.length - 1];
+  return `${list.charAt(0).toUpperCase() + list.slice(1)} with ${TYPE_NAME[type].toLowerCase()}${w.length > 1 ? ', mixed together' : ''}, at ${levelWords(stg.level)}.`;
+}
+function stageStats(stg) {
+  const rec = (S.plan.rec[stg.id] || []).slice(-PLAN_N);
+  const right = rec.filter(r => r[1]).map(r => r[0]);
+  const n = rec.length, acc = n ? right.length / n : 0, med = median(right), goal = S.settings.goal;
+  const medOK = med != null && med <= goal + 1e-9, accOK = n > 0 && acc >= 0.9 - 1e-9;
+  return { n, acc, med, medOK, accOK, pass: n >= PLAN_N && medOK && accOK };
+}
+function passStage(stg, skipped) {
+  S.plan.done[stg.id] = { t: Date.now(), skip: !!skipped };
+  const next = planFirstOpen(planIndex(stg.id) + 1);
+  if (!S.plan.active || S.plan.active === stg.id) S.plan.active = next ? next.id : '';
+  const cur = planActive();
+  RT.queue = RT.queue.filter(q => cur.cells.includes(q.p.cell));   // retries from an earlier topic don't follow you
+  if (!skipped) {
+    if (RT.sess && RT.sess.running) (RT.sess.passed || (RT.sess.passed = [])).push(stageLabel(stg));
+    toast(next ? `Stage passed! Next: ${stageLabel(next)}` : 'You passed every stage of the plan!');
+  }
+}
+// Practise a stage: turns the plan on. A session already under way carries on with the new stage.
+function practiseStage(id) {
+  S.plan.on = true; S.plan.active = id; RT.drill = null; touch(true);
+  const stg = planActive();
+  RT.queue = RT.queue.filter(q => stg.cells.includes(q.p.cell));
+  if (sessTicking()) { showView('practice'); userResume(); nextQuestion(); return; }
+  RT.state = 'ready';
+  showView('practice');
+}
+function leavePlan() {
+  S.plan.on = false; touch(true); renderStatus();
+  if (RT.view === 'practice' && (RT.state === 'ask' || RT.state === 'fb') && !(RT.sess && RT.sess.timeUp)) { RT.queue = []; nextQuestion(); }
+  if (RT.view === 'plan') renderPlan();
+  toast('Left the plan. Practice uses your Settings again.');
+}
+function startWeeklyTest() { if (testRunning()) return; showView('test'); startTest(WEEKLY_TEST); }
+const PLAN_ICON = {
+  done: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="var(--fast)"/><path d="M4.7 8.3l2.2 2.2 4.4-4.7" fill="none" stroke="var(--sheet)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  skip: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="var(--ink-3)" stroke-width="1.6"/><path d="M5.4 8h5.2" stroke="var(--ink-3)" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  now: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="var(--pen)" stroke-width="2"/><circle cx="8" cy="8" r="2.7" fill="var(--pen)"/></svg>',
+  todo: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="var(--rule)" stroke-width="1.6"/></svg>',
+};
+function renderPlan() {
+  const box = $('#planBody'), goal = S.settings.goal, pl = S.plan;
+  const doneN = PLAN.filter(s => planDone(s.id)).length, skipN = PLAN.filter(s => pl.done[s.id] && pl.done[s.id].skip).length, started = pl.on || doneN > 0 || Object.keys(pl.rec).length > 0;
+  const stg = planActive(), st = stageStats(stg), idx = planIndex(stg.id), complete = planComplete();
+  let top;
+  if (!started) {
+    top = `<div class="card">
+      <span class="eyebrow">Study plan</span>
+      <h2 style="margin-top:6px">A step-by-step path to ${goal} seconds</h2>
+      <p>One thing at a time: whole numbers, then decimals, then fractions. Each operation starts at Foundations level, then moves to Test level. After every new operation there's a mixed round with the ones you've already passed, and the plan ends with everything mixed, the way the real test is.</p>
+      <p>You pass a stage with ${PLAN_N} answers in it, a median of ${goal}s or less on the right ones and at least 90% right. Only your last ${PLAN_N} answers in a stage count, so slow early ones drop off. Pick any practice length; the plan just chooses the questions.</p>
+      <div class="btn-row"><button type="button" class="btn primary block" id="btnPlanStart">Start the plan</button></div>
+    </div>`;
+  } else {
+    const kMed = st.med == null ? '–' : st.med.toFixed(1) + 's';
+    const kpiCheck = (label, v, sub, ok) => `<div class="kpi${ok ? ' ok' : ''}"><div class="eyebrow">${ok ? PLAN_ICON.done : ''}${esc(label)}</div><div class="v">${v}</div><div class="s">${esc(sub)}</div></div>`;
+    top = `<div class="card plan-now">
+      <span class="eyebrow">${complete ? 'Plan complete' : `Stage ${idx + 1} of ${PLAN.length} · ${esc(stg.group)}`}</span>
+      <h2 style="margin-top:6px">${esc(stg.title)} <span class="lvl">${esc(LEVEL_NAME[stg.level])}</span></h2>
+      <p>${complete ? `You've passed every stage. Keep practising the full mix and take the weekly check to stay at ${goal} seconds.` : esc(stageDesc(stg))}</p>
+      <div class="plan-track" role="img" aria-label="${doneN} of ${PLAN.length} stages done"><span style="width:${(100 * doneN / PLAN.length).toFixed(1)}%"></span></div>
+      <div class="plan-count">${doneN} of ${PLAN.length} stages done${skipN ? ` · ${skipN} skipped` : ''}</div>
+      ${planDone(stg.id) ? '' : `<div class="kpis">${kpiCheck('Answers', `${Math.min(st.n, PLAN_N)}/${PLAN_N}`, `needs ${PLAN_N}`, st.n >= PLAN_N)}${kpiCheck('Median', kMed, `needs ≤ ${goal}.0s`, st.medOK)}${kpiCheck('Right', st.n ? Math.round(st.acc * 100) + '%' : '–', 'needs 90%+', st.accOK)}</div>`}
+      <div class="btn-row"><button type="button" class="btn primary" id="btnPlanGo">${pl.on ? 'Practise this stage' : 'Continue the plan'}</button>${planDone(stg.id) ? '' : '<button type="button" class="btn ghost" id="btnPlanSkip">Skip this stage</button>'}</div>
+    </div>`;
+  }
+  const full = S.tests.filter(t => t.full), last = full[full.length - 1];
+  const days = last ? Math.floor((Date.now() - last.at) / 86400000) : null;
+  const weekly = `<div class="card">
+      <span class="eyebrow">Weekly check</span>
+      <p style="margin-top:6px">Once a week, take the full ${WEEKLY_TEST.min}-minute test: every operation and number type at Test level, missing numbers included. It's the closest thing to the real screen, so it shows how far you've come.</p>
+      <p class="plan-weekly">${last ? `Last one: ${esc(fmtDate(last.at))}${days === 0 ? ' (today)' : days === 1 ? ' (yesterday)' : ` (${days} days ago)`} · score ${signed(last.score)} · ${last.pace ? last.pace.toFixed(1) + 's per right answer' : 'no right answers'}${days >= 7 ? ' · <b>due now</b>' : ''}` : "You haven't taken one yet."}</p>
+      <div class="btn-row"><button type="button" class="btn" id="btnWeekly">Take the weekly check</button></div>
+    </div>`;
+  let list = '', group = '';
+  PLAN.forEach((s, i) => {
+    if (s.group !== group) { if (group) list += '</div>'; group = s.group; list += `<span class="eyebrow plan-group">${esc(group)}</span><div class="plan-list">`; }
+    const d = pl.done[s.id], isNow = started && !complete && s.id === stg.id;
+    const icon = d ? (d.skip ? PLAN_ICON.skip : PLAN_ICON.done) : isNow ? PLAN_ICON.now : PLAN_ICON.todo;
+    const ss = stageStats(s);
+    const meta = d && d.skip ? 'skipped' : ss.n ? `${ss.med == null ? '–' : ss.med.toFixed(1) + 's'} · ${Math.round(ss.acc * 100)}%` : '';
+    const state = d ? (d.skip ? 'Skipped' : 'Passed') : isNow ? 'Current stage' : 'Not passed yet';
+    list += `<button type="button" class="stage-row${isNow ? ' now' : ''}${d ? ' done' : ''}" data-stage="${s.id}" aria-label="Stage ${i + 1}: ${esc(stageLabel(s))}. ${state}.${ss.n ? ` Median ${ss.med == null ? 'none' : ss.med.toFixed(1) + ' seconds'}, ${Math.round(ss.acc * 100)}% right.` : ''} Practise it.">
+      <span class="st-icon">${icon}</span><span class="st-num">${i + 1}</span>
+      <span class="st-main"><span class="st-title">${esc(s.title)}</span><span class="st-sub">${esc(LEVEL_NAME[s.level])}</span></span>
+      <span class="st-meta">${meta}</span></button>`;
+  });
+  list += '</div>';
+  box.innerHTML = `${top}${weekly}
+    <div class="card"><span class="eyebrow">All stages</span><p style="margin-top:6px">Tap any stage to practise it. The plan moves you on by itself when you pass the one you're on.</p>${list}</div>
+    ${started ? `<div class="store-line"><span>${pl.on ? 'The plan is choosing your practice questions.' : "The plan is off. Practice uses your Settings."}</span><span class="confirm" id="planResetBox">${pl.on ? '<button type="button" class="btn ghost" id="btnPlanLeave">Leave the plan</button>' : ''}<button type="button" class="btn ghost" id="btnPlanReset">Start over</button></span></div>` : ''}`;
+  const on = (sel, fn) => { const el = $(sel, box); if (el) el.addEventListener('click', fn); };
+  on('#btnPlanStart', () => practiseStage((planFirstOpen(0) || PLAN[0]).id));
+  on('#btnPlanGo', () => practiseStage(stg.id));
+  on('#btnPlanSkip', () => { passStage(stg, true); touch(true); renderPlan(); renderStatus(); toast(`Skipped. Next: ${stageLabel(planActive())}`); });
+  on('#btnWeekly', startWeeklyTest);
+  on('#btnPlanLeave', leavePlan);
+  on('#btnPlanReset', () => {
+    const rb = $('#planResetBox');
+    rb.innerHTML = `<span>Clear your plan progress? Your times and tests stay.</span><button type="button" class="btn" id="btnPlanResetYes">Clear</button><button type="button" class="btn ghost" id="btnPlanResetNo">Keep</button>`;
+    $('#btnPlanResetYes').addEventListener('click', () => { S.plan = { on: S.plan.on, active: '', done: {}, rec: {} }; touch(true); renderPlan(); renderStatus(); toast('Plan progress cleared'); });
+    $('#btnPlanResetNo').addEventListener('click', renderPlan);
+    $('#btnPlanResetNo').focus();
+  });
+  $$('.stage-row', box).forEach(b => b.addEventListener('click', () => practiseStage(b.dataset.stage)));
 }
 
 // ---------------------------------------------------------------- status strip
@@ -678,11 +865,23 @@ function renderStatus() {
   tally.title = S.settings.adaptive ? 'Get 8 of 10 fast to lower the target' : 'Your last 10 answers';
   $('#drillBar').hidden = !RT.drill;
   if (RT.drill) $('#drillName').textContent = cellShort(RT.drill);
+  $('#drillExit').textContent = S.plan.on ? 'Back to the plan' : 'Back to the mix';
+  const stg = planStage();
+  $('#planBar').hidden = !stg;
+  if (stg) {
+    const st = stageStats(stg), med = st.med == null ? '–' : st.med.toFixed(1) + 's', acc = Math.round(st.acc * 100) + '% right';
+    $('#planNum').textContent = `Plan · stage ${planIndex(stg.id) + 1} of ${PLAN.length}`;
+    $('#planName').textContent = stageLabel(stg);
+    $('#planProg').textContent = planDone(stg.id) ? 'Passed' + (st.n ? ` · median ${med} · ${acc}` : '')
+      : st.n ? `${Math.min(st.n, PLAN_N)}/${PLAN_N} answers · median ${med} · ${acc}`
+      : `Pass with ${PLAN_N} answers: median ${S.settings.goal}s or less, 90% right`;
+  }
 }
 function onStateReplaced() {
   renderStatus();
   if (!$('#settings').hidden) renderSettings();
   if (RT.view === 'progress') renderProgress();
+  if (RT.view === 'plan') renderPlan();
   if (RT.view === 'test' && RT.testView === 'setup') renderTestSetup();
   if (RT.state === 'ready') showReady();
 }
@@ -696,8 +895,9 @@ function showView(v) {
   }
   RT.view = v;
   $$('.tabs [role=tab]').forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === v)));
-  ['practice', 'test', 'progress'].forEach(n => { $('#view-' + n).hidden = n !== v; });
+  ['practice', 'plan', 'test', 'progress'].forEach(n => { $('#view-' + n).hidden = n !== v; });
   if (v === 'practice') enterPractice();
+  else if (v === 'plan') renderPlan();
   else if (v === 'test') { if (RT.testView !== 'result') renderTestSetup(); else { $('#testSetup').hidden = true; $('#testResult').hidden = false; } }
   else renderProgress();
 }
@@ -735,10 +935,12 @@ function renderTestSetup() {
 }
 function clockText(secs) { const m = Math.floor(secs / 60), s = Math.round(secs % 60); return m + ':' + String(s).padStart(2, '0'); }
 function signed(n) { return (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n); }
-function startTest() {
+// cfg: the weekly check's fixed mix (WEEKLY_TEST); without it the test uses Settings.
+function startTest(cfg) {
+  cfg = cfg && cfg.cells ? cfg : null;
   dropSession();
-  RT.mode = 'test'; RT.queue = []; RT.drill = null;
-  RT.test = { running: true, dur: S.settings.testMin * 60, start: now(), pausedMs: 0, score: 0, right: 0, wrong: 0, skipped: 0, log: [] };
+  RT.mode = 'test'; RT.queue = []; RT.drill = null; RT.testCfg = cfg;
+  RT.test = { running: true, dur: (cfg ? cfg.min : S.settings.testMin) * 60, start: now(), pausedMs: 0, score: 0, right: 0, wrong: 0, skipped: 0, log: [], full: !!cfg };
   RT.testView = 'run';
   $('#testSetup').hidden = true; $('#testResult').hidden = true; $('#testRun').hidden = false;
   $('#testSlot').appendChild($('#playArea'));
@@ -767,7 +969,8 @@ function endTest(early) {
   T.running = false; stopLoop(); RT.state = 'ready';
   const used = early ? Math.max(1, Math.min(T.dur, (now() - T.start - T.pausedMs) / 1000)) : T.dur;
   const pace = T.right ? used / T.right : null;
-  const rec = { at: Date.now(), dur: T.dur, used: Math.round(used), score: T.score, right: T.right, wrong: T.wrong, skipped: T.skipped, pace: pace ? Math.round(pace * 10) / 10 : null, level: S.settings.level, early: !!early };
+  const rec = { at: Date.now(), dur: T.dur, used: Math.round(used), score: T.score, right: T.right, wrong: T.wrong, skipped: T.skipped, pace: pace ? Math.round(pace * 10) / 10 : null, level: RT.testCfg ? RT.testCfg.level : S.settings.level, early: !!early };
+  if (T.full) rec.full = true;
   if (T.right + T.wrong + T.skipped > 0) { S.tests.push(rec); if (S.tests.length > 60) S.tests.shift(); touch(true); }
   $$('.tabs [role=tab]').forEach(t => { t.disabled = false; });
   $('#btnSettings').disabled = false; $('#btnAccount').disabled = false;
@@ -793,7 +996,7 @@ function renderTestResult(rec, log) {
   else verdict = `About ${(pace - goal).toFixed(1)}s per answer still to find. The slow ones are below with faster ways to do them.`;
   const proj = rec.used !== 480 && rec.used > 30 ? `≈ ${signed(Math.round(rec.score * 480 / rec.used))} over 8 min` : '';
   box.innerHTML = `<div class="card">
-      <span class="eyebrow">Result · ${rec.early ? 'ended at ' + clockText(rec.used) + ' of ' : ''}${rec.dur / 60} min</span>
+      <span class="eyebrow">${rec.full ? 'Weekly check · ' : 'Result · '}${rec.early ? 'ended at ' + clockText(rec.used) + ' of ' : ''}${rec.dur / 60} min</span>
       <div class="result-hero"><span class="big">${pace ? pace.toFixed(1) + 's' : '–'}</span><span class="unit">per right answer · goal ${goal}.0s</span></div>
       <p>${esc(verdict)}</p>
       <div class="kpis">${kpi('Score', signed(rec.score), proj)}${kpi('Right', rec.right)}${kpi('Wrong', rec.wrong, rec.wrong ? '−1 each' : '')}${kpi('Skipped', rec.skipped)}</div>
@@ -801,7 +1004,8 @@ function renderTestResult(rec, log) {
     </div>
     ${missed.length ? `<div><span class="eyebrow">Missed or skipped · ${missed.length}</span><div class="review">${missed.slice(0, 20).map(reviewItem).join('')}</div></div>` : ''}
     ${slow.length ? `<div><span class="eyebrow">Right, but over ${goal}s</span><div class="review">${slow.map(reviewItem).join('')}</div></div>` : ''}`;
-  $('#btnAgain').addEventListener('click', startTest);
+  const again = RT.testCfg;
+  $('#btnAgain').addEventListener('click', () => startTest(again));
   $('#btnFromTest').addEventListener('click', () => {
     RT.queue = missed.slice(0, 6).map((x, i) => ({ p: x.p, due: 1 + 2 * i }));
     RT.testView = 'setup';
@@ -884,7 +1088,7 @@ function refreshStoreLine() {
 function fmtDate(ts) { try { return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); } catch (e) { return ''; } }
 function askReset() {
   const box = $('#resetBox');
-  box.innerHTML = `<span>Clear your target, times and tests?</span><button type="button" class="btn" id="btnResetYes">Reset</button><button type="button" class="btn ghost" id="btnResetNo">Keep</button>`;
+  box.innerHTML = `<span>Clear your target, times, tests and study plan?</span><button type="button" class="btn" id="btnResetYes">Reset</button><button type="button" class="btn ghost" id="btnResetNo">Keep</button>`;
   $('#btnResetYes').addEventListener('click', () => {
     const keep = S.settings; S = defaults(); S.settings = keep; S.target = keep.start;
     RT.tally = []; RT.streak = 0; RT.queue = []; if (RT.sess) RT.sess.startTarget = S.target;
@@ -964,6 +1168,7 @@ function renderSettings() {
   $('#swAdaptive').setAttribute('aria-checked', String(!!st.adaptive));
   $('#swHard').setAttribute('aria-checked', String(!!st.hard));
   $('#levelDesc').textContent = LEVEL_DESC[st.level];
+  $('#planNote').hidden = !S.plan.on;
 }
 function openSettings() {
   if (testRunning()) return;
@@ -984,6 +1189,7 @@ function closeSettings() {
   if (RT.state === 'ready') showReady();
   renderStatus();
   if (RT.view === 'progress') renderProgress();
+  if (RT.view === 'plan') renderPlan();
   if (RT.view === 'test' && RT.testView === 'setup') renderTestSetup();
 }
 function changed(topics) { if (topics) RT.topicsDirty = true; sanitize(); touch(true); renderSettings(); renderStatus(); }
@@ -1236,6 +1442,7 @@ function bindInput() {
     const n = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
     n.focus(); showView(n.dataset.view); e.preventDefault();
   });
+  $('#planExit').addEventListener('click', leavePlan);
   $('#drillExit').addEventListener('click', () => { RT.drill = null; RT.queue = []; renderStatus(); if ((RT.state === 'ask' || RT.state === 'fb') && !(RT.sess && RT.sess.timeUp)) nextQuestion(); });
   $('#durSeg').addEventListener('click', e => { const b = e.target.closest('[data-min]'); if (!b) return; S.settings.testMin = +b.dataset.min; touch(false); renderTestSetup(); });
   $('#btnStartTest').addEventListener('click', startTest);

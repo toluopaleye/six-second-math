@@ -10,8 +10,8 @@
 <meta property="og:title" content="Six Second Math">
 <meta property="og:description" content="Get to six seconds a question on +, −, ×, ÷, decimals and fractions. Miss one and see how to break it down in your head.">
 <meta property="og:type" content="website">
-<link rel="icon" href="icon.svg?v=d065f36c" type="image/svg+xml">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=d065f36c">
+<link rel="icon" href="icon.svg?v=51f34a56" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=51f34a56">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500;600;700&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
@@ -108,7 +108,7 @@ button:focus-visible, [tabindex]:focus-visible, summary:focus-visible { outline:
 .icon-btn:hover { background: var(--pen-wash); color: var(--ink); }
 .icon-btn svg { width: 22px; height: 22px; }
 
-.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; margin-top: 6px; background: var(--paper-deep); border: 1px solid var(--rule); border-radius: 11px; }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; padding: 3px; margin-top: 6px; background: var(--paper-deep); border: 1px solid var(--rule); border-radius: 11px; }
 .tabs button { border: 0; background: transparent; border-radius: 8px; padding: 7px 4px; font-weight: 550; color: var(--ink-2); cursor: pointer; }
 .tabs button[aria-selected="true"] { background: var(--sheet); color: var(--ink); box-shadow: var(--shadow); }
 .tabs button:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -165,6 +165,36 @@ button:focus-visible, [tabindex]:focus-visible, summary:focus-visible { outline:
 .sess-btns .btn { padding: 6px 12px; font-size: 14px; gap: 6px; white-space: nowrap; }
 .sess-btns .btn svg { width: 12px; height: 12px; }
 .sess-btns .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* study plan */
+.planbar { display: grid; grid-template-columns: 1fr auto; column-gap: 10px; row-gap: 1px; align-items: center; }
+.planbar .pb-name, .planbar .pb-prog { grid-column: 1 / -1; min-width: 0; }
+.planbar .pb-name { font-weight: 650; }
+.planbar .pb-prog { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.planbar button { white-space: nowrap; }
+.plan-now .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.plan-now h2 .lvl { display: inline-block; vertical-align: 3px; margin-left: 6px; padding: 2px 9px; border-radius: 999px; background: var(--pen-wash); font: 600 12.5px/1.4 var(--font-ui); letter-spacing: 0; color: var(--ink); }
+.plan-track { position: relative; height: 8px; margin-top: 16px; border-radius: 4px; background: var(--paper-deep); box-shadow: inset 0 0 0 1px var(--rule); overflow: hidden; }
+.plan-track span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--fast); border-radius: 4px; }
+.plan-count { margin-top: 6px; font-size: 12.5px; color: var(--ink-2); }
+.kpi .eyebrow svg { display: inline-block; width: 11px; height: 11px; margin-right: 5px; vertical-align: -1px; }
+.kpi.ok { border-color: var(--fast); }
+.plan-weekly { font-size: 14px; }
+.plan-weekly b { color: var(--ink); }
+.plan-group { display: block; margin: 16px 0 6px; }
+.plan-list { display: grid; gap: 2px; }
+.stage-row { display: grid; grid-template-columns: 18px 1.6rem 1fr auto; gap: 8px; align-items: center; width: 100%; padding: 7px 8px; border: 1px solid transparent; border-radius: 10px; background: transparent; text-align: left; cursor: pointer; }
+.stage-row:hover, .stage-row:focus-visible { background: var(--pen-wash); }
+.stage-row.now { background: var(--pen-wash); border-color: var(--pen); }
+.st-icon svg { display: block; width: 16px; height: 16px; }
+.st-num { font: 500 12px var(--font-num); color: var(--ink-3); text-align: right; }
+.st-main { display: grid; min-width: 0; }
+.st-title { font-size: 14.5px; font-weight: 550; }
+.st-sub { font-size: 12px; color: var(--ink-2); }
+.stage-row.done .st-title { color: var(--ink-2); }
+.st-meta { font: 500 12.5px var(--font-num); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sum-plan { display: flex; gap: 8px; align-items: baseline; color: var(--ink) !important; font-weight: 550; }
+.sum-plan svg { flex: none; width: 11px; height: 11px; transform: translateY(1px); }
+.plan-note { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--pen-wash); font-size: 13.5px; color: var(--ink); }
 .summary .kpi .eyebrow svg { display: inline-block; width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; }
 .p { color: var(--ink-2); }
 .hint { min-height: 20px; margin-top: 6px; text-align: center; font-size: 13px; color: var(--ink-2); }
@@ -410,6 +440,7 @@ table.hist td.num, table.hist th.num { text-align: right; font-family: var(--fon
   </header>
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button type="button" role="tab" id="tab-practice" data-view="practice" aria-selected="true" aria-controls="view-practice">Practice</button>
+    <button type="button" role="tab" id="tab-plan" data-view="plan" aria-selected="false" aria-controls="view-plan">Plan</button>
     <button type="button" role="tab" id="tab-test" data-view="test" aria-selected="false" aria-controls="view-test">Test</button>
     <button type="button" role="tab" id="tab-progress" data-view="progress" aria-selected="false" aria-controls="view-progress">Progress</button>
   </nav>
@@ -423,6 +454,7 @@ table.hist td.num, table.hist th.num { text-align: right; font-family: var(--fon
         <div class="streak"><span class="eyebrow">Streak</span><b id="streakVal">0</b></div>
       </div>
       <div class="drillbar" id="drillBar" hidden><span>Drilling <b id="drillName"></b></span><button type="button" id="drillExit">Back to the mix</button></div>
+      <div class="drillbar planbar" id="planBar" hidden><span class="eyebrow" id="planNum">Plan</span><button type="button" id="planExit">Leave plan</button><b class="pb-name" id="planName"></b><span class="pb-prog" id="planProg"></span></div>
       <div class="sessbar" id="sessBar" hidden>
         <div class="target-pill sess-pill" title="Time in this practice session"><span class="eyebrow">Session</span><b id="sessClock" aria-live="off">0:00</b><span class="sub" id="sessSub">left</span></div>
         <div class="sess-btns">
@@ -431,6 +463,11 @@ table.hist td.num, table.hist th.num { text-align: right; font-family: var(--fon
         </div>
       </div>
       <div id="practiceSlot"></div>
+    </section>
+
+    <!-- PLAN -->
+    <section class="view" id="view-plan" role="tabpanel" aria-labelledby="tab-plan" hidden>
+      <div id="planBody"></div>
     </section>
 
     <!-- TEST -->
@@ -535,6 +572,7 @@ table.hist td.num, table.hist th.num { text-align: right; font-family: var(--fon
   <div class="scrim" id="settings" hidden>
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <div class="sheet-head"><h2 id="settingsTitle">Settings</h2><button type="button" class="btn" id="btnCloseSettings">Done</button></div>
+      <p class="plan-note" id="planNote" hidden>The study plan is choosing your practice topics and level right now. These settings apply to tests, and to practice when you leave the plan.</p>
       <div class="group">
         <span class="eyebrow">Operations</span>
         <div class="chips" id="opChips">
@@ -585,9 +623,9 @@ table.hist td.num, table.hist th.num { text-align: right; font-family: var(--fon
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </div>
 
-<script src="config.js?v=d065f36c"></script>
-<script src="cloud.js?v=d065f36c"></script>
-<script src="engine.js?v=d065f36c"></script>
-<script src="app.js?v=d065f36c"></script>
+<script src="config.js?v=51f34a56"></script>
+<script src="cloud.js?v=51f34a56"></script>
+<script src="engine.js?v=51f34a56"></script>
+<script src="app.js?v=51f34a56"></script>
 </body>
 </html>
