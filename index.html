@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Six Second Math</title>
+<meta name="description" content="Mental math trainer for trading and quant interviews: +, −, ×, ÷, decimals and fractions against a per-question target that steps down to 6 seconds, with a step-by-step mental breakdown whenever you miss.">
+<meta name="theme-color" content="#EDF2EA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F1C27" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Six Second Math">
+<meta property="og:description" content="Get to six seconds a question on +, −, ×, ÷, decimals and fractions. Miss one and see how to break it down in your head.">
+<meta property="og:type" content="website">
+<link rel="icon" href="icon.svg?v=40f5f608" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=40f5f608">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500;600;700&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one centred column (max 34rem) on quad-ruled engineering paper. The problem and its timer are the hero;
+   the keypad docks underneath like a calculator, and the breakdown takes the keypad's place after a miss. */
+:root {
+  --paper: #EDF2EA;
+  --paper-deep: #E1E8DC;
+  --sheet: #F9FBF6;
+  --grid: rgba(48, 102, 76, 0.085);
+  --grid-major: rgba(48, 102, 76, 0.16);
+  --ink: #17251F;
+  --ink-2: #44544C;
+  --ink-3: #66766E;
+  --rule: #C9D4C6;
+  --pen: #2447B8;
+  --pen-ink: #FFFFFF;
+  --pen-wash: rgba(36, 71, 184, 0.09);
+  --series: #2447B8;
+  --series-wash: rgba(36, 71, 184, 0.10);
+  --fast: #1E7F4A;
+  --fast-wash: rgba(30, 127, 74, 0.13);
+  --slow: #B07A00;
+  --slow-wash: rgba(176, 122, 0, 0.15);
+  --miss: #C8302C;
+  --miss-wash: rgba(200, 48, 44, 0.11);
+  --key: #FBFCF8;
+  --key-edge: #C2CEBF;
+  --key-down: #E3EADF;
+  --scrim: rgba(12, 24, 18, 0.42);
+  --shadow: 0 1px 2px rgba(23, 37, 31, 0.06), 0 6px 18px rgba(23, 37, 31, 0.06);
+  --font-num: "Azeret Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-ui: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0F1C27; --paper-deep: #0A151E; --sheet: #142434;
+    --grid: rgba(150, 190, 230, 0.055); --grid-major: rgba(150, 190, 230, 0.11);
+    --ink: #E4ECF2; --ink-2: #A9B8C4; --ink-3: #8797A4; --rule: #2A3E51;
+    --pen: #8DB0FF; --pen-ink: #0F1C27; --pen-wash: rgba(141, 176, 255, 0.13);
+    --series: #5B8DFF; --series-wash: rgba(91, 141, 255, 0.12);
+    --fast: #34A86E; --fast-wash: rgba(52, 168, 110, 0.17);
+    --slow: #C9961E; --slow-wash: rgba(201, 150, 30, 0.17);
+    --miss: #E8574A; --miss-wash: rgba(232, 87, 74, 0.16);
+    --key: #172A3B; --key-edge: #2B4256; --key-down: #1E3548;
+    --scrim: rgba(0, 0, 0, 0.55);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0F1C27; --paper-deep: #0A151E; --sheet: #142434;
+  --grid: rgba(150, 190, 230, 0.055); --grid-major: rgba(150, 190, 230, 0.11);
+  --ink: #E4ECF2; --ink-2: #A9B8C4; --ink-3: #8797A4; --rule: #2A3E51;
+  --pen: #8DB0FF; --pen-ink: #0F1C27; --pen-wash: rgba(141, 176, 255, 0.13);
+  --series: #5B8DFF; --series-wash: rgba(91, 141, 255, 0.12);
+  --fast: #34A86E; --fast-wash: rgba(52, 168, 110, 0.17);
+  --slow: #C9961E; --slow-wash: rgba(201, 150, 30, 0.17);
+  --miss: #E8574A; --miss-wash: rgba(232, 87, 74, 0.16);
+  --key: #172A3B; --key-edge: #2B4256; --key-down: #1E3548;
+  --scrim: rgba(0, 0, 0, 0.55);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.25);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+html, body { min-height: 100%; }
+body { margin: 0; }
+body {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  color: var(--ink);
+  font: 400 15px/1.45 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; }
+button:focus-visible, [tabindex]:focus-visible, summary:focus-visible { outline: 2px solid var(--pen); outline-offset: 2px; }
+.app { max-width: 34rem; margin: 0 auto; padding-inline: 16px; padding-block: 10px 20px; }
+
+/* header */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.mark { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 1.5px solid var(--ink); border-radius: 7px; font: 700 12px/1 var(--font-num); letter-spacing: -0.02em; background: var(--sheet); }
+.brand h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -0.01em; }
+.icon-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 1px solid transparent; border-radius: 10px; background: transparent; cursor: pointer; color: var(--ink-2); }
+.icon-btn:hover { background: var(--pen-wash); color: var(--ink); }
+.icon-btn svg { width: 22px; height: 22px; }
+
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 3px; margin-top: 6px; background: var(--paper-deep); border: 1px solid var(--rule); border-radius: 11px; }
+.tabs button { border: 0; background: transparent; border-radius: 8px; padding: 7px 4px; font-weight: 550; color: var(--ink-2); cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--sheet); color: var(--ink); box-shadow: var(--shadow); }
+.tabs button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-2); }
+
+/* status strip */
+.statusbar { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; margin-top: 14px; min-height: 30px; }
+.target-pill { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 10px; border: 1px solid var(--rule); border-radius: 999px; background: var(--sheet); white-space: nowrap; }
+.target-pill b { font: 600 15px/1 var(--font-num); }
+.target-pill .goal { font-size: 12px; color: var(--ink-2); }
+.tally { display: flex; justify-content: center; gap: 4px; min-width: 0; }
+.tally svg { width: 12px; height: 12px; display: block; }
+.streak { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.streak b { font: 600 15px/1 var(--font-num); }
+.drillbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 8px 12px; border-radius: 10px; background: var(--pen-wash); font-size: 14px; }
+.drillbar button { border: 1px solid var(--rule); background: var(--sheet); border-radius: 8px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+
+/* stage */
+.stage { position: relative; padding-block: 16px 6px; }
+.meta { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 22px; }
+.meta .cat { font-size: 11.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-2); }
+.retry { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 550; padding: 2px 9px; border-radius: 999px; background: var(--pen-wash); color: var(--ink); }
+.retry svg { width: 12px; height: 12px; color: var(--pen); }
+.problem { margin-top: 10px; text-align: center; font-family: var(--font-num); font-weight: 500; font-size: 52px; line-height: 1.2; min-height: 1.5em; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.pline { display: inline-flex; align-items: center; white-space: nowrap; letter-spacing: -0.015em; }
+.op { padding: 0 0.26em; color: var(--ink-2); font-weight: 400; }
+.fr { display: inline-flex; flex-direction: column; align-items: stretch; vertical-align: middle; font-size: 0.6em; line-height: 1.08; text-align: center; margin: 0 0.04em; }
+.fr .fn { border-bottom: 0.075em solid currentColor; padding: 0 0.14em 0.04em; }
+.fr .fd { padding: 0.04em 0.14em 0; }
+.slot { display: inline-flex; align-items: center; justify-content: center; min-width: 2.1ch; min-height: 1.12em; padding: 0 0.14em; border-bottom: 0.08em solid var(--pen); color: var(--ink); transition: background-color 0.12s, border-color 0.12s; border-radius: 0.08em 0.08em 0 0; }
+.slot .typed { white-space: pre; }
+.caret { display: inline-block; width: 0.06em; height: 0.86em; margin-left: 0.04em; background: var(--pen); animation: blink 1.05s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
+.stage.flash-right .slot { background: var(--fast-wash); border-color: var(--fast); }
+.stage.flash-wrong .slot { background: var(--miss-wash); border-color: var(--miss); }
+.slot.shown { border-color: var(--ink-3); }
+.slot.shown.ok { border-color: var(--fast); background: var(--fast-wash); }
+.ready { display: grid; justify-items: center; gap: 14px; text-align: center; padding: 26px 8px 18px; }
+.ready-line { font-size: 17px; }
+.ready-line b { font: 650 19px var(--font-num); }
+.ready .btn { min-width: 12rem; padding: 12px 20px; font-size: 16px; }
+.ready p { margin: 0; max-width: 36ch; font-size: 14px; color: var(--ink-2); }
+.keypad.idle { opacity: 0.55; }
+/* practice length, pause and stop */
+.len { display: grid; justify-items: center; gap: 8px; width: 100%; }
+.seg.len-seg { display: grid; grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); width: 100%; max-width: 21rem; }
+.seg.len-seg button { padding: 8px 6px; }
+.sessbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.sess-pill b { font-variant-numeric: tabular-nums; }
+.sess-pill b.low { color: var(--miss); }
+.sess-pill .sub { font-size: 12px; color: var(--ink-2); }
+.sess-btns { display: flex; gap: 8px; }
+.sess-btns .btn { padding: 6px 12px; font-size: 14px; gap: 6px; white-space: nowrap; }
+.sess-btns .btn svg { width: 12px; height: 12px; }
+.sess-btns .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.summary .kpi .eyebrow svg { display: inline-block; width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; }
+.p { color: var(--ink-2); }
+.hint { min-height: 20px; margin-top: 6px; text-align: center; font-size: 13px; color: var(--ink-2); }
+.hint.warn { color: var(--ink); font-weight: 550; }
+.shake .pline { animation: shake 0.28s; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+.timer { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; margin-top: 10px; }
+.track { position: relative; height: 8px; border-radius: 4px; background: var(--paper-deep); box-shadow: inset 0 0 0 1px var(--rule); }
+.fill { position: absolute; inset: 0; border-radius: 4px; background: var(--pen); transform-origin: left center; transform: scaleX(0); }
+.timer.over .fill { background: var(--slow); }
+.tick { position: absolute; top: -4px; width: 2px; height: 16px; background: var(--ink); border-radius: 1px; transform: translateX(-1px); }
+.tick span { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); font: 500 11px/1 var(--font-num); color: var(--ink-2); white-space: nowrap; }
+.elapsed { font: 500 15px/1 var(--font-num); font-variant-numeric: tabular-nums; min-width: 4.6ch; text-align: right; }
+.timer.over .elapsed::after { content: " over"; font: 500 11px var(--font-ui); color: var(--ink-2); }
+
+/* dock + keypad */
+.dock { margin-top: 18px; }
+.actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px; padding: 9px 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--rule); background: var(--sheet); color: var(--ink); }
+.btn:hover { border-color: var(--ink-3); }
+.btn.primary { background: var(--pen); border-color: var(--pen); color: var(--pen-ink); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.ghost { background: transparent; }
+.btn.block { width: 100%; padding: 13px 16px; font-size: 16px; }
+.btn svg { width: 16px; height: 16px; }
+.actions .btn { white-space: nowrap; flex-shrink: 0; }
+.kbd-hint { font-size: 12.5px; color: var(--ink-2); text-align: right; display: none; }
+@media (hover: hover) and (pointer: fine) and (min-width: 600px) { .kbd-hint { display: block; } }
+.dock.is-ready .actions { visibility: hidden; }
+.keypad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; user-select: none; -webkit-user-select: none; }
+.key { appearance: none; border: 1px solid var(--key-edge); border-bottom-width: 3px; background: var(--key); color: var(--ink); border-radius: 12px; font: 500 22px/1 var(--font-num); height: clamp(46px, 7.2vh, 58px); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; display: grid; place-items: center; }
+.key:active, .key.down { transform: translateY(1px); border-bottom-width: 2px; background: var(--key-down); }
+.key.fn-key { font-size: 18px; color: var(--ink-2); }
+.key.enter { grid-row: span 2; height: auto; background: var(--pen); border-color: var(--pen); color: var(--pen-ink); font-size: 24px; }
+.key.zero { grid-column: span 2; }
+.key svg { width: 24px; height: 24px; }
+
+/* breakdown */
+.breakdown { margin-top: 16px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 16px; padding: 16px; box-shadow: var(--shadow); }
+.bd-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px; font-size: 13px; font-weight: 650; border: 1px solid var(--rule); background: var(--sheet); white-space: nowrap; }
+.chip svg { width: 12px; height: 12px; }
+.chip.miss { background: var(--miss-wash); border-color: transparent; }
+.chip.slow { background: var(--slow-wash); border-color: transparent; }
+.chip.fast { background: var(--fast-wash); border-color: transparent; }
+.bd-detail { font-size: 14px; color: var(--ink-2); }
+.bd-detail .n, .bd-detail b { font-family: var(--font-num); font-weight: 600; color: var(--ink); }
+.bd-answer { display: flex; align-items: baseline; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.bd-answer .val { font: 600 28px/1.15 var(--font-num); }
+.bd-answer .alt { font: 500 16px var(--font-num); color: var(--ink-2); }
+.bd-method { margin: 14px 0 6px; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; text-wrap: balance; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: st; }
+.steps li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; counter-increment: st; }
+.steps li::before { content: counter(st); display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--pen); color: var(--pen); font: 600 12px/1 var(--font-num); margin-top: 1px; }
+.step-body { min-width: 0; }
+.say { font-size: 15px; line-height: 1.5; }
+.note { font-size: 13.5px; color: var(--ink-2); line-height: 1.4; margin-bottom: 2px; }
+.calc { font: 500 17px/1.5 var(--font-num); display: flex; flex-wrap: wrap; align-items: center; column-gap: 0.4em; }
+.calc .term { display: inline-flex; align-items: center; white-space: nowrap; }
+.calc .eqs { color: var(--ink-2); }
+.calc .o { padding: 0 0.3em; color: var(--ink-2); }
+.calc .term:last-child { font-weight: 650; }
+.say .fr, .note .fr, .rule .fr, .bd-detail .fr { font-size: 0.78em; }
+.calc .fr { font-size: 0.72em; }
+.say .n, .note .n, .rule .n { font-family: var(--font-num); font-size: 0.95em; font-weight: 550; }
+.say .o, .note .o, .rule .o { padding: 0 0.2em; }
+.rule { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--pen-wash); }
+.rule p { margin: 4px 0 0; font-size: 14.5px; }
+.bd-foot { margin-top: 14px; display: grid; gap: 8px; }
+.bd-foot .muted { margin: 0; font-size: 13px; color: var(--ink-2); text-align: center; }
+
+/* cards */
+.card { background: var(--sheet); border: 1px solid var(--rule); border-radius: 16px; padding: 18px 16px; box-shadow: var(--shadow); }
+.card h2 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.015em; text-wrap: balance; }
+.card p { margin: 8px 0 0; color: var(--ink-2); max-width: 62ch; }
+.seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; padding: 3px; background: var(--paper-deep); border: 1px solid var(--rule); border-radius: 10px; }
+.seg button { border: 0; background: transparent; border-radius: 7px; padding: 7px 12px; font-weight: 550; color: var(--ink-2); cursor: pointer; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--sheet); color: var(--ink); box-shadow: var(--shadow); }
+.rules-list { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 14px; }
+.rules-list li { display: flex; gap: 8px; align-items: baseline; }
+.rules-list .k { font: 600 13px var(--font-num); min-width: 3.2ch; }
+.view { margin-top: 14px; }
+.view > * + * { margin-top: 14px; }
+
+/* test */
+.testbar { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin-top: 14px; }
+.clock { font: 600 30px/1 var(--font-num); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.clock.low { color: var(--miss); }
+.scoreline { display: flex; gap: 16px; justify-content: center; }
+.scoreline span { display: grid; justify-items: center; gap: 3px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.scoreline b { font: 650 17px/1 var(--font-num); letter-spacing: 0; color: var(--ink); }
+.result-hero { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.result-hero .big { font: 650 56px/1 var(--font-ui); letter-spacing: -0.03em; }
+.result-hero .unit { font-size: 16px; color: var(--ink-2); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-top: 16px; }
+.kpi { border: 1px solid var(--rule); border-radius: 12px; padding: 10px 12px; background: var(--sheet); }
+.kpi .v { font: 650 22px/1.1 var(--font-ui); margin-top: 4px; }
+.kpi .s { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+.review { display: grid; gap: 8px; margin-top: 10px; }
+.review details { border: 1px solid var(--rule); border-radius: 12px; background: var(--sheet); }
+.review summary { list-style: none; cursor: pointer; padding: 10px 12px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.review summary::-webkit-details-marker { display: none; }
+.review .q { font: 500 17px var(--font-num); min-width: 0; overflow-wrap: anywhere; }
+.review .q .fr { font-size: 0.7em; }
+.review .q .o { padding: 0 0.3em; color: var(--ink-2); }
+.review .q b { font-weight: 650; }
+.review .meta2 { font-size: 13px; color: var(--ink-2); text-align: right; white-space: nowrap; }
+.review .inner { padding: 0 12px 12px; }
+.review .inner .bd-method { margin-top: 2px; }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.btn-row .btn { flex: 1 1 10rem; }
+
+/* progress */
+.hero-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hero-fig { font: 650 60px/0.95 var(--font-ui); letter-spacing: -0.035em; }
+.hero-fig small { font-size: 22px; letter-spacing: -0.01em; color: var(--ink-2); font-weight: 600; margin-left: 2px; }
+.ladder { display: flex; gap: 4px; align-items: flex-end; }
+.ladder span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--rule); font: 600 12px var(--font-num); color: var(--ink-2); background: var(--sheet); }
+.ladder span.done { background: var(--pen-wash); border-color: transparent; color: var(--ink); }
+.ladder span.now { background: var(--pen); color: var(--pen-ink); border-color: var(--pen); }
+.ladder span.goal { border-style: solid; border-color: var(--fast); }
+.bars { display: grid; gap: 4px; margin-top: 12px; }
+.bar-row { display: grid; grid-template-columns: minmax(6.5rem, 8.5rem) 1fr auto; gap: 10px; align-items: center; padding: 6px 6px; border-radius: 10px; cursor: pointer; border: 1px solid transparent; background: transparent; text-align: left; width: 100%; }
+.bar-row:hover, .bar-row:focus-visible { background: var(--pen-wash); }
+.bar-row .lbl { font-size: 14px; font-weight: 550; min-width: 0; }
+.bar-row .lbl .sym { font-family: var(--font-num); display: inline-block; width: 1.3em; }
+.bar-row .sub { display: block; font-size: 12px; color: var(--ink-2); font-weight: 400; }
+.btrack { position: relative; height: 22px; }
+.btrack .bfill { position: absolute; left: 0; top: 6px; height: 10px; background: var(--series); border-radius: 0 4px 4px 0; }
+.btrack .base { position: absolute; left: 0; top: 2px; bottom: 2px; width: 1px; background: var(--rule); }
+.btrack .gtick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--fast); }
+.btrack .ttick { position: absolute; top: 3px; bottom: 3px; width: 1px; background: var(--ink-3); }
+.bar-row .val { font: 600 14px var(--font-num); font-variant-numeric: tabular-nums; min-width: 4.4ch; text-align: right; display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.bar-row .val svg { width: 11px; height: 11px; }
+.axis-note { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
+.axis-note i { display: inline-block; width: 10px; height: 2px; vertical-align: middle; margin-right: 5px; }
+.chart-wrap { position: relative; margin-top: 10px; }
+.chart-wrap svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart-wrap svg text { font: 500 11px var(--font-num); fill: var(--ink-2); }
+.tip { position: absolute; pointer-events: none; background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 8px 10px; box-shadow: var(--shadow); font-size: 12.5px; color: var(--ink-2); white-space: nowrap; transform: translate(-50%, -100%); }
+.tip b { display: block; font: 650 15px var(--font-num); color: var(--ink); }
+.tip .key-line { display: inline-block; width: 12px; height: 2px; background: var(--series); vertical-align: middle; margin-right: 6px; }
+table.hist { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+table.hist th { text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; padding: 6px 4px; border-bottom: 1px solid var(--rule); }
+table.hist td { padding: 7px 4px; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+table.hist td.num, table.hist th.num { text-align: right; font-family: var(--font-num); }
+.empty { padding: 14px; border: 1px dashed var(--rule); border-radius: 12px; color: var(--ink-2); font-size: 14px; }
+.store-line { font-size: 12.5px; color: var(--ink-2); display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.confirm { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* settings sheet */
+.scrim { position: fixed; inset: 0; background: var(--scrim); display: flex; align-items: flex-end; justify-content: center; z-index: 40; }
+.sheet { width: 100%; max-width: 34rem; max-height: 88vh; overflow: auto; background: var(--sheet); border-radius: 18px 18px 0 0; padding: 18px 16px calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow: var(--shadow); }
+@media (min-width: 640px) { .scrim { align-items: center; } .sheet { border-radius: 18px; } }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sheet-head h2 { margin: 0; font-size: 19px; font-weight: 650; }
+.group { margin-top: 18px; }
+.group > .eyebrow { display: block; margin-bottom: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-btn { border: 1px solid var(--rule); background: var(--sheet); border-radius: 10px; padding: 8px 12px; font-weight: 550; cursor: pointer; min-width: 44px; }
+.chip-btn.op { font: 600 18px/1 var(--font-num); min-width: 52px; }
+.chip-btn[aria-pressed="true"] { border-color: var(--pen); background: var(--pen-wash); box-shadow: inset 0 0 0 1px var(--pen); }
+.switch-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--rule); }
+.switch-row:first-of-type { border-top: 0; }
+.switch-row .t { font-weight: 550; }
+.switch-row .d { font-size: 13px; color: var(--ink-2); }
+.switch { position: relative; width: 46px; height: 28px; border-radius: 999px; border: 1px solid var(--rule); background: var(--paper-deep); cursor: pointer; padding: 0; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--ink-3); transition: transform 0.15s, background-color 0.15s; }
+.switch[aria-checked="true"] { background: var(--pen); border-color: var(--pen); }
+.switch[aria-checked="true"]::after { transform: translateX(18px); background: var(--pen-ink); }
+.level-desc { font-size: 13px; color: var(--ink-2); margin-top: 8px; min-height: 2.6em; }
+.seg.full { display: grid; width: 100%; }
+.switch-row.stack { grid-template-columns: 1fr; gap: 8px; }
+.switch-row.stack .seg { justify-self: start; }
+
+.top-actions { display: flex; align-items: center; gap: 6px; }
+.acct-btn { border: 1px solid var(--rule); background: var(--sheet); border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: 14px; cursor: pointer; min-height: 36px; }
+.acct-btn:hover { border-color: var(--ink-3); }
+.acct-btn.signed { padding: 3px; border-color: transparent; background: transparent; }
+.acct-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.avatar { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--pen); color: var(--pen-ink); font: 650 14px/1 var(--font-ui); }
+.avatar.big { width: 48px; height: 48px; font-size: 20px; }
+.acct-body { margin-top: 12px; display: grid; gap: 12px; }
+.acct-lede { margin: 0; color: var(--ink-2); }
+.or { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-2); }
+.or::before, .or::after { content: ""; height: 1px; background: var(--rule); }
+.acct-form { display: grid; gap: 6px; }
+.acct-form label { font-size: 13px; font-weight: 600; color: var(--ink-2); margin-top: 4px; }
+.acct-form input { width: 100%; font: 16px var(--font-ui); padding: 11px 12px; border-radius: 10px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+.acct-form input:focus { outline: 2px solid var(--pen); outline-offset: 1px; border-color: var(--pen); }
+.form-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.form-row .btn { flex: 1 1 9rem; padding: 11px 14px; }
+.linkish { border: 0; background: none; padding: 4px 0; color: var(--pen); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; justify-self: start; font-size: inherit; }
+.store-line .linkish { padding: 0; }
+.form-msg { margin: 2px 0 0; min-height: 1.4em; font-size: 14px; color: var(--ink-2); }
+.form-msg.err { color: var(--ink); font-weight: 550; }
+.form-msg.err::before { content: "× "; color: var(--miss); font-weight: 700; }
+.fine { margin: 0; font-size: 13px; color: var(--ink-2); }
+.acct-who { display: flex; align-items: center; gap: 12px; }
+.who-text { min-width: 0; }
+.who-text .t { font-weight: 650; overflow-wrap: anywhere; }
+.who-text .d { font-size: 13px; color: var(--ink-2); overflow-wrap: anywhere; }
+.sync-line { margin: 0; font-size: 14px; }
+.toast { position: fixed; left: 50%; top: calc(10px + env(safe-area-inset-top, 0px)); transform: translate(-50%, -20px); opacity: 0; visibility: hidden; width: max-content; background: var(--ink); color: var(--paper); padding: 9px 16px; border-radius: 999px; font-size: 14px; font-weight: 550; box-shadow: var(--shadow); transition: transform 0.25s, opacity 0.25s, visibility 0.25s; z-index: 60; max-width: calc(100% - 32px); text-align: center; }
+.toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  .caret { animation: none; }
+  .shake .pline { animation: none; }
+  .toast, .switch::after, .slot { transition: none; }
+}
+@media (max-width: 440px) {
+  .target-pill .goal { display: none; }
+  .tally { gap: 3px; }
+  .tally svg { width: 11px; height: 11px; }
+}
+@media (max-width: 400px) {
+  .brand h1 { font-size: 15px; }
+  .acct-btn { padding: 6px 11px; font-size: 13px; }
+}
+@media (max-width: 380px) {
+  .sess-pill .eyebrow { display: none; }
+  .sess-btns { gap: 6px; }
+  .sess-btns .btn { padding: 6px 10px; }
+  .problem { font-size: 44px; }
+  .tally svg { width: 9px; height: 9px; }
+  .streak { display: none; }
+}
+</style>
+</head>
+<body>
+<noscript><p style="padding:16px">Six Second Math needs JavaScript turned on.</p></noscript>
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand"><span class="mark" aria-hidden="true">6s</span><h1>Six Second Math</h1></div>
+    <div class="top-actions">
+    <button class="acct-btn" id="btnAccount" type="button" aria-haspopup="dialog">Sign in</button>
+    <button class="icon-btn" id="btnSettings" type="button" aria-label="Settings" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+    </button>
+    </div>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" id="tab-practice" data-view="practice" aria-selected="true" aria-controls="view-practice">Practice</button>
+    <button type="button" role="tab" id="tab-test" data-view="test" aria-selected="false" aria-controls="view-test">Test</button>
+    <button type="button" role="tab" id="tab-progress" data-view="progress" aria-selected="false" aria-controls="view-progress">Progress</button>
+  </nav>
+
+  <main>
+    <!-- PRACTICE -->
+    <section class="view" id="view-practice" role="tabpanel" aria-labelledby="tab-practice">
+      <div class="statusbar">
+        <div class="target-pill" title="Answer inside this time to count as fast"><span class="eyebrow">Target</span><b id="tgtVal">10s</b><span class="goal">goal <span id="goalVal">6s</span></span></div>
+        <div class="tally" id="tally" role="img" aria-label="Last 10 answers"></div>
+        <div class="streak"><span class="eyebrow">Streak</span><b id="streakVal">0</b></div>
+      </div>
+      <div class="drillbar" id="drillBar" hidden><span>Drilling <b id="drillName"></b></span><button type="button" id="drillExit">Back to the mix</button></div>
+      <div class="sessbar" id="sessBar" hidden>
+        <div class="target-pill sess-pill" title="Time in this practice session"><span class="eyebrow">Session</span><b id="sessClock" aria-live="off">0:00</b><span class="sub" id="sessSub">left</span></div>
+        <div class="sess-btns">
+          <button type="button" class="btn ghost" id="btnPause" title="Pause (P)" aria-keyshortcuts="P">Pause</button>
+          <button type="button" class="btn ghost" id="btnStop"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1.6" fill="currentColor"/></svg><span>Stop</span></button>
+        </div>
+      </div>
+      <div id="practiceSlot"></div>
+    </section>
+
+    <!-- TEST -->
+    <section class="view" id="view-test" role="tabpanel" aria-labelledby="tab-test" hidden>
+      <div id="testSetup" class="card">
+        <span class="eyebrow">Timed test</span>
+        <h2>How many can you get in <span id="durWord">8 minutes</span>?</h2>
+        <p>The real screens give you about six seconds a question. Same scoring here: right answers go through on their own, a wrong one you submit costs a point, and skipping costs nothing. No breakdowns until the end.</p>
+        <div style="margin-top:14px"><div class="seg" id="durSeg" role="group" aria-label="Test length">
+          <button type="button" data-min="2" aria-pressed="false">2 min</button>
+          <button type="button" data-min="5" aria-pressed="false">5 min</button>
+          <button type="button" data-min="8" aria-pressed="true">8 min</button>
+        </div></div>
+        <ul class="rules-list">
+          <li><span class="k">+1</span><span>for each right answer</span></li>
+          <li><span class="k">−1</span><span>for each wrong answer you submit with ↵</span></li>
+          <li><span class="k">0</span><span>for a skip</span></li>
+        </ul>
+        <p id="testTopics" style="font-size:13.5px"></p>
+        <div class="btn-row"><button type="button" class="btn primary block" id="btnStartTest">Start the test</button></div>
+        <p id="testBest" style="font-size:13.5px"></p>
+      </div>
+      <div id="testRun" hidden>
+        <div class="testbar">
+          <div class="clock" id="clock" aria-live="off">8:00</div>
+          <div class="scoreline"><span>Score <b id="tScore">0</b></span><span>Right <b id="tRight">0</b></span><span>Wrong <b id="tWrong">0</b></span></div>
+          <button type="button" class="btn ghost" id="btnEndTest">End</button>
+        </div>
+        <div id="testSlot"></div>
+      </div>
+      <div id="testResult" hidden></div>
+    </section>
+
+    <!-- PROGRESS -->
+    <section class="view" id="view-progress" role="tabpanel" aria-labelledby="tab-progress" hidden>
+      <div id="progressBody"></div>
+    </section>
+  </main>
+
+  <!-- The question stage and keypad move between Practice and Test -->
+  <div id="playArea">
+    <div class="stage" id="stage">
+      <div class="ready" id="ready">
+        <div class="ready-line">Target <b id="readyTarget">10s</b> a question. Goal <b id="readyGoal">6s</b>.</div>
+        <div class="len">
+          <span class="eyebrow" id="lenLabel">How long?</span>
+          <div class="seg len-seg" id="lenSeg" role="group" aria-labelledby="lenLabel">
+            <button type="button" data-len="2" aria-pressed="false">2 min</button>
+            <button type="button" data-len="5" aria-pressed="false">5 min</button>
+            <button type="button" data-len="10" aria-pressed="false">10 min</button>
+            <button type="button" data-len="15" aria-pressed="false">15 min</button>
+            <button type="button" data-len="20" aria-pressed="false">20 min</button>
+            <button type="button" data-len="0" aria-pressed="true">Until I stop</button>
+          </div>
+        </div>
+        <button type="button" class="btn primary" id="btnStart">Start practising</button>
+        <p>Get one wrong or go over the target and you'll see how to break it down in your head. A similar question comes back a few later so you can use the method straight away.</p>
+      </div>
+      <div class="ready" id="paused" hidden>
+        <span class="eyebrow">Paused</span>
+        <div class="ready-line"><b id="pausedClock">0:00</b> <span id="pausedSub">left in this session</span></div>
+        <button type="button" class="btn primary" id="btnResume">Resume</button>
+        <p>Your question and the clock wait until you come back.</p>
+      </div>
+      <div class="card summary" id="summary" hidden></div>
+      <div id="stageQ" hidden>
+        <div class="meta"><span class="cat" id="catLabel"></span><span class="retry" id="retryTag" hidden></span></div>
+        <div class="problem" id="problem" role="math"></div>
+        <div class="hint" id="hint" aria-live="polite"></div>
+        <div class="timer" id="timer">
+          <div class="track" aria-hidden="true"><div class="fill" id="timerFill"></div><div class="tick" id="timerTick"><span id="tickLbl">10s</span></div></div>
+          <div class="elapsed" id="elapsed">0.0s</div>
+        </div>
+      </div>
+    </div>
+    <div class="dock" id="dock">
+      <div class="actions">
+        <button type="button" class="btn ghost" id="btnShow">Show me how</button>
+        <button type="button" class="btn ghost" id="btnSkip" hidden>Skip</button>
+        <span class="kbd-hint" id="kbdHint">Right answers go through on their own · ↵ submits · Esc shows how</span>
+      </div>
+      <div class="keypad" id="keypad" aria-label="Number pad">
+        <button type="button" class="key" data-k="7" tabindex="-1">7</button>
+        <button type="button" class="key" data-k="8" tabindex="-1">8</button>
+        <button type="button" class="key" data-k="9" tabindex="-1">9</button>
+        <button type="button" class="key fn-key" data-k="back" tabindex="-1" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5-6z"/><path d="M12.5 10l4 4M16.5 10l-4 4"/></svg></button>
+        <button type="button" class="key" data-k="4" tabindex="-1">4</button>
+        <button type="button" class="key" data-k="5" tabindex="-1">5</button>
+        <button type="button" class="key" data-k="6" tabindex="-1">6</button>
+        <button type="button" class="key fn-key" data-k="/" tabindex="-1" aria-label="Fraction bar">/</button>
+        <button type="button" class="key" data-k="1" tabindex="-1">1</button>
+        <button type="button" class="key" data-k="2" tabindex="-1">2</button>
+        <button type="button" class="key" data-k="3" tabindex="-1">3</button>
+        <button type="button" class="key enter" data-k="enter" tabindex="-1" aria-label="Submit">↵</button>
+        <button type="button" class="key zero" data-k="0" tabindex="-1">0</button>
+        <button type="button" class="key" data-k="." tabindex="-1" aria-label="Decimal point">.</button>
+      </div>
+    </div>
+    <div class="breakdown" id="breakdown" hidden></div>
+  </div>
+
+  <div class="scrim" id="settings" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="sheet-head"><h2 id="settingsTitle">Settings</h2><button type="button" class="btn" id="btnCloseSettings">Done</button></div>
+      <div class="group">
+        <span class="eyebrow">Operations</span>
+        <div class="chips" id="opChips">
+          <button type="button" class="chip-btn op" data-op="add" aria-label="Addition">+</button>
+          <button type="button" class="chip-btn op" data-op="sub" aria-label="Subtraction">−</button>
+          <button type="button" class="chip-btn op" data-op="mul" aria-label="Multiplication">×</button>
+          <button type="button" class="chip-btn op" data-op="div" aria-label="Division">÷</button>
+        </div>
+      </div>
+      <div class="group">
+        <span class="eyebrow">Numbers</span>
+        <div class="chips" id="typeChips">
+          <button type="button" class="chip-btn" data-type="whole">Whole numbers</button>
+          <button type="button" class="chip-btn" data-type="dec">Decimals</button>
+          <button type="button" class="chip-btn" data-type="frac">Fractions</button>
+        </div>
+      </div>
+      <div class="group">
+        <div class="switch-row"><div><div class="t">Fraction and decimal conversions</div><div class="d">Questions like 3/8 = ? and 0.35 = ?. Needs fractions on.</div></div><button type="button" class="switch" role="switch" id="swConv" aria-label="Fraction and decimal conversions"></button></div>
+        <div class="switch-row"><div><div class="t">Missing-number questions</div><div class="d">Some questions come as 66 × ? = 138.6, like the real tests.</div></div><button type="button" class="switch" role="switch" id="swMissing" aria-label="Missing-number questions"></button></div>
+      </div>
+      <div class="group">
+        <span class="eyebrow">Level</span>
+        <div class="seg full" id="levelSeg" role="group" aria-label="Level">
+          <button type="button" data-level="1">Foundations</button>
+          <button type="button" data-level="2">Test level</button>
+          <button type="button" data-level="3">Hard</button>
+        </div>
+        <div class="level-desc" id="levelDesc"></div>
+      </div>
+      <div class="group">
+        <span class="eyebrow">Timer</span>
+        <div class="switch-row"><div><div class="t">Lower the target as you improve</div><div class="d">Drops 1 second when 8 of your last 10 are fast. Eases back 1 second when 6 of 10 miss.</div></div><button type="button" class="switch" role="switch" id="swAdaptive" aria-label="Lower the target as you improve"></button></div>
+        <div class="switch-row stack"><div><div class="t">Starting target</div><div class="d">Seconds per question. Choosing one resets the target.</div></div>
+          <div class="seg" id="startSeg" role="group" aria-label="Starting target"><button type="button" data-s="6">6s</button><button type="button" data-s="8">8s</button><button type="button" data-s="10">10s</button><button type="button" data-s="12">12s</button><button type="button" data-s="15">15s</button></div></div>
+        <div class="switch-row stack"><div><div class="t">Goal</div><div class="d">Where the target stops dropping.</div></div>
+          <div class="seg" id="goalSeg" role="group" aria-label="Goal"><button type="button" data-g="5">5s</button><button type="button" data-g="6">6s</button><button type="button" data-g="7">7s</button></div></div>
+        <div class="switch-row"><div><div class="t">Hard cutoff</div><div class="d">Show the breakdown the moment time runs out instead of letting you finish.</div></div><button type="button" class="switch" role="switch" id="swHard" aria-label="Hard cutoff"></button></div>
+      </div>
+    </div>
+  </div>
+  <div class="scrim" id="account" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+      <div class="sheet-head"><h2 id="accountTitle">Sign in</h2><button type="button" class="btn" id="btnCloseAccount">Close</button></div>
+      <div id="accountBody" class="acct-body"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<script src="config.js?v=40f5f608"></script>
+<script src="cloud.js?v=40f5f608"></script>
+<script src="engine.js?v=40f5f608"></script>
+<script src="app.js?v=40f5f608"></script>
+</body>
+</html>
