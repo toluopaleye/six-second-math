@@ -17,8 +17,12 @@ const G = {
 };
 const OPS = ['add', 'sub', 'mul', 'div'], TYPES = ['whole', 'dec', 'frac'];
 const PRACTICE_LENGTHS = [0, 2, 5, 10, 15, 20];   // minutes; 0 = keep going until you press Stop
-const OP_SYM = { add: '+', sub: '−', mul: '×', div: '÷', conv: '⇄' };
+const OP_SYM = { add: '+', sub: '−', mul: '×', div: '÷', conv: '⇄', pct: '%' };
 const TYPE_NAME = { whole: 'Whole numbers', dec: 'Decimals', frac: 'Fractions' };
+// Percent topics: converting, p% of a number, what percent (or the whole), and going up or down by a percent.
+const PCT_CELLS = ['pct.conv', 'pct.of', 'pct.what', 'pct.chg'];
+const PCT_SHORT = { conv: 'Percent conversions', of: '% of a number', what: 'What percent', chg: '% up and down' };
+const PCT_ROW = { conv: 'Conversions', of: 'Of a number', what: 'What percent', chg: 'Up and down' };
 const LEVEL_DESC = {
   1: 'Times tables, two-digit sums, tenths and friendly fractions. Good for building the habits.',
   2: 'The 80-in-8 mix: three-digit sums, two-digit products, decimals like 2.7 × 60, fractions like 3/4 ÷ 3/8.',
@@ -32,7 +36,7 @@ const LEVEL_DESC = {
 const PLAN_N = 30;
 const LEVEL_NAME = { 1: 'Foundations', 2: 'Test level', 3: 'Hard' };
 const OP_WORD = { add: 'addition', sub: 'subtraction', mul: 'multiplication', div: 'division' };
-const ALL_CELLS = OPS.flatMap(o => TYPES.map(t => o + '.' + t)).concat('conv.frac');
+const ALL_CELLS = OPS.flatMap(o => TYPES.map(t => o + '.' + t)).concat('conv.frac', PCT_CELLS);
 const PLAN = (() => {
   const out = [];
   const add = (id, group, title, cells, level, missing) => out.push({ id, group, title, cells, level, missing: !!missing });
@@ -47,6 +51,13 @@ const PLAN = (() => {
   }
   add('conv.1', 'Fractions', 'Fraction ⇄ decimal', ['conv.frac'], 1);
   add('conv.2', 'Fractions', 'Fraction ⇄ decimal', ['conv.frac'], 2);
+  const pk = [['conv', 'Percent ⇄ fraction, decimal', 'convert'], ['of', '% of a number', '% of'], ['what', 'What percent', 'what %'], ['chg', '% up and down', 'up and down']], pdone = [];
+  for (const [k, title, short] of pk) {
+    add(`pct.${k}.1`, 'Percentages', title, ['pct.' + k], 1);
+    add(`pct.${k}.2`, 'Percentages', title, ['pct.' + k], 2);
+    pdone.push([k, short]);
+    if (pdone.length > 1) add(`pct.mix${pdone.length}`, 'Percentages', `Mixed percents: ${pdone.map(x => x[1]).join(', ')}`, pdone.map(x => 'pct.' + x[0]), 2);
+  }
   add('all.2', 'Everything', 'Everything mixed', ALL_CELLS, 2);
   add('all.miss', 'Everything', 'Everything, with missing numbers', ALL_CELLS, 2, true);
   return out;
@@ -58,7 +69,7 @@ const LS_KEY = 'six-second-math:v1';
 function defaults() {
   return {
     v: 1, updatedAt: 0,
-    settings: { ops: { add: true, sub: true, mul: true, div: true }, types: { whole: true, dec: true, frac: true }, conv: true, missing: false, level: 2, start: 10, goal: 6, hard: false, adaptive: true, testMin: 8, practiceMin: 0 },
+    settings: { ops: { add: true, sub: true, mul: true, div: true }, types: { whole: true, dec: true, frac: true }, conv: true, pct: true, missing: false, level: 2, start: 10, goal: 6, hard: false, adaptive: true, testMin: 8, practiceMin: 0 },
     target: 10, win: [], cells: {}, tests: [], totals: { n: 0, f: 0 }, bestStreak: 0, hist: '',
     plan: { on: false, active: '', done: {}, rec: {} },
   };
@@ -211,8 +222,8 @@ const RT = {
 };
 
 // ---------------------------------------------------------------- choosing questions
-function cellName(id) { const [op, t] = id.split('.'); return op === 'conv' ? 'Conversions' : TYPE_NAME[t]; }
-function cellShort(id) { const op = id.split('.')[0]; return op === 'conv' ? 'Fraction ⇄ decimal' : OP_SYM[op] + ' ' + cellName(id); }
+function cellName(id) { const [op, t] = id.split('.'); return op === 'conv' ? 'Conversions' : op === 'pct' ? PCT_ROW[t] : TYPE_NAME[t]; }
+function cellShort(id) { const [op, t] = id.split('.'); return op === 'conv' ? 'Fraction ⇄ decimal' : op === 'pct' ? PCT_SHORT[t] : OP_SYM[op] + ' ' + cellName(id); }
 // What questions come from: a weekly-check test, a drilled topic, the study plan's stage, or Settings.
 function activeCells() {
   if (RT.mode === 'test' && RT.testCfg) return RT.testCfg.cells;
@@ -222,6 +233,7 @@ function activeCells() {
   const st = S.settings, out = [];
   for (const op of OPS) if (st.ops[op]) for (const t of TYPES) if (st.types[t]) out.push(op + '.' + t);
   if (st.types.frac && st.conv) out.push('conv.frac');
+  if (st.pct) out.push(...PCT_CELLS);
   return out.length ? out : ['add.whole'];
 }
 function topicLevel() {
@@ -241,7 +253,7 @@ function weakness(id) {
   return rec.filter(r => r[1] > 0).length / rec.length;
 }
 function pickCell() {
-  const pairs = activeCells().map(id => [(id === 'conv.frac' ? 0.5 : 1) * (1 + 1.5 * weakness(id)), id]);
+  const pairs = activeCells().map(id => [(id === 'conv.frac' || id.startsWith('pct.') ? 0.5 : 1) * (1 + 1.5 * weakness(id)), id]);
   let tot = 0; pairs.forEach(p => { tot += p[0]; });
   let x = Math.random() * tot;
   for (const p of pairs) { x -= p[0]; if (x < 0) return p[1]; }
@@ -299,8 +311,9 @@ function altHTML(p) {
   if (p.ansNum.k === 'dec' && hasFracToken(p) && p.form !== 'dec') return `<span class="alt">= ${numHTML({ v: a, k: 'frac', n: a.n, d: a.d })}</span>`;
   return '';
 }
+function wordTok(t, cls) { return t === '%' ? '<span class="pc">%</span>' : /^[a-z]+$/.test(t) ? `<span class="${cls} wd">${t}</span>` : `<span class="${cls}">${t}</span>`; }
 function questionWithAnswerHTML(p) {
-  return p.q.map(t => t === '?' ? `<b>${numHTML(p.ansNum)}</b>` : typeof t === 'string' ? `<span class="o">${t}</span>` : exprHTML(t)).join('');
+  return p.q.map(t => t === '?' ? `<b>${numHTML(p.ansNum)}</b>` : typeof t === 'string' ? wordTok(t, 'o') : exprHTML(t)).join('');
 }
 
 // ---------------------------------------------------------------- the question stage
@@ -314,7 +327,7 @@ function renderProblem(opts) {
   if (opts && opts.answer) slot = `<span class="slot shown${opts.ok ? ' ok' : ''}">${numHTML(p.ansNum)}</span>`;
   else if (opts && opts.measure) slot = `<span class="slot" id="slot"><span class="typed" style="visibility:hidden">${esc(MM.numText(p.ansNum).replace(/,/g, ''))}</span><span class="caret"></span></span>`;
   else slot = `<span class="slot" id="slot">${slotInner()}</span>`;
-  const html = p.q.map(t => t === '?' ? slot : typeof t === 'string' ? `<span class="op">${t}</span>` : exprHTML(t)).join('');
+  const html = p.q.map(t => t === '?' ? slot : typeof t === 'string' ? wordTok(t, 'op') : exprHTML(t)).join('');
   const box = $('#problem');
   box.innerHTML = `<span class="pline">${html}</span>`;
   box.setAttribute('aria-label', MM.plainTokens(p.q));
@@ -339,6 +352,7 @@ function defaultHint() {
   if (p.form === 'dec') return 'Answer as a decimal';
   if (p.form === 'fracSimplest') return 'Answer as a fraction in lowest terms';
   if (RT.mode === 'practice' && S.totals.n < 3) return 'Right answers go through on their own. Use ↵ to submit anything else.';
+  if (p.q[p.q.indexOf('?') + 1] === '%' && PCT_CELLS.reduce((a, c) => a + ((S.cells[c] && S.cells[c].n) || 0), 0) < 12) return 'Type the number. The % sign is already there.';
   if (p.ansNum.k === 'frac' && S.totals.n < 40) return 'Type fractions with the / key, like 3/8';
   return '';
 }
@@ -737,7 +751,12 @@ function planStage() { return S.plan.on && RT.mode === 'practice' && !RT.drill ?
 function stageLabel(stg) { return stg.title + ' · ' + LEVEL_NAME[stg.level]; }
 function levelWords(L) { return L === 1 ? 'Foundations level' : 'Test level'; }
 function stageDesc(stg) {
-  if (stg.cells.length === ALL_CELLS.length) return `Every operation with whole numbers, decimals and fractions, plus conversions, at Test level${stg.missing ? ', with some missing-number questions like 66 × ? = 138.6' : ''}. This is the real test.`;
+  if (stg.cells.length === ALL_CELLS.length) return `Every operation with whole numbers, decimals and fractions, plus conversions and percentages, at Test level${stg.missing ? ', with some missing-number questions like 66 × ? = 138.6' : ''}. This is the real test.`;
+  if (stg.cells.every(c => c.startsWith('pct.'))) {
+    if (stg.cells.length > 1) return `Mixed together: ${stg.cells.map(c => PCT_SHORT[c.split('.')[1]].toLowerCase()).join(', ')}, at Test level.`;
+    return { conv: 'Turning fractions and decimals into percents and back, like 3/8 = 37.5% and 45% = 9/20', of: 'Percent of a number, like 15% of 280 = 42 and 51% of 60 = 30.6',
+      what: 'Finding the percent or the whole, like 36 is ?% of 240 and 42 is 15% of ?', chg: 'Going up or down by a percent, and the percent change, like 240 up 15% = 276 and 80 down ?% = 64' }[stg.cells[0].split('.')[1]] + `, at ${levelWords(stg.level)}.`;
+  }
   if (stg.cells[0] === 'conv.frac') return `Turning fractions into decimals and back, like 3/8 = 0.375, at ${levelWords(stg.level)}.`;
   const type = stg.cells[0].split('.')[1], w = stg.cells.map(c => OP_WORD[c.split('.')[0]]);
   const list = w.length === 1 ? w[0] : w.slice(0, -1).join(', ') + ' and ' + w[w.length - 1];
@@ -792,7 +811,7 @@ function renderPlan() {
     top = `<div class="card">
       <span class="eyebrow">Study plan</span>
       <h2 style="margin-top:6px">A step-by-step path to ${goal} seconds</h2>
-      <p>One thing at a time: whole numbers, then decimals, then fractions. Each operation starts at Foundations level, then moves to Test level. After every new operation there's a mixed round with the ones you've already passed, and the plan ends with everything mixed, the way the real test is.</p>
+      <p>One thing at a time: whole numbers, then decimals, then fractions, then percentages. Each operation starts at Foundations level, then moves to Test level. After every new operation there's a mixed round with the ones you've already passed, and the plan ends with everything mixed, the way the real test is.</p>
       <p>You pass a stage with ${PLAN_N} answers in it, a median of ${goal}s or less on the right ones and at least 90% right. Only your last ${PLAN_N} answers in a stage count, so slow early ones drop off. Pick any practice length; the plan just chooses the questions.</p>
       <div class="btn-row"><button type="button" class="btn primary block" id="btnPlanStart">Start the plan</button></div>
     </div>`;
@@ -813,7 +832,7 @@ function renderPlan() {
   const days = last ? Math.floor((Date.now() - last.at) / 86400000) : null;
   const weekly = `<div class="card">
       <span class="eyebrow">Weekly check</span>
-      <p style="margin-top:6px">Once a week, take the full ${WEEKLY_TEST.min}-minute test: every operation and number type at Test level, missing numbers included. It's the closest thing to the real screen, so it shows how far you've come.</p>
+      <p style="margin-top:6px">Once a week, take the full ${WEEKLY_TEST.min}-minute test: every operation and number type at Test level, percentages and missing numbers included. It's the closest thing to the real screen, so it shows how far you've come.</p>
       <p class="plan-weekly">${last ? `Last one: ${esc(fmtDate(last.at))}${days === 0 ? ' (today)' : days === 1 ? ' (yesterday)' : ` (${days} days ago)`} · score ${signed(last.score)} · ${last.pace ? last.pace.toFixed(1) + 's per right answer' : 'no right answers'}${days >= 7 ? ' · <b>due now</b>' : ''}` : "You haven't taken one yet."}</p>
       <div class="btn-row"><button type="button" class="btn" id="btnWeekly">Take the weekly check</button></div>
     </div>`;
@@ -918,7 +937,7 @@ function topicSummary() {
   const ops = OPS.filter(o => st.ops[o]).map(o => OP_SYM[o]).join(' ');
   const types = TYPES.filter(t => st.types[t]).map(t => TYPE_NAME[t].toLowerCase()).join(', ');
   const lv = { 1: 'Foundations', 2: 'Test level', 3: 'Hard' }[st.level];
-  return `Uses your settings: ${ops} with ${types}${st.missing ? ', missing-number questions on' : ''}, ${lv}.`;
+  return `Uses your settings: ${ops} with ${types}${st.pct ? ', plus percentages' : ''}${st.missing ? ', missing-number questions on' : ''}, ${lv}.`;
 }
 function renderTestSetup() {
   RT.testView = 'setup';
@@ -1165,6 +1184,7 @@ function renderSettings() {
   $('#swConv').setAttribute('aria-checked', String(!!st.conv));
   $('#swConv').disabled = !st.types.frac;
   $('#swMissing').setAttribute('aria-checked', String(!!st.missing));
+  $('#swPct').setAttribute('aria-checked', String(!!st.pct));
   $('#swAdaptive').setAttribute('aria-checked', String(!!st.adaptive));
   $('#swHard').setAttribute('aria-checked', String(!!st.hard));
   $('#levelDesc').textContent = LEVEL_DESC[st.level];
@@ -1208,6 +1228,7 @@ function bindSettings() {
   });
   $('#swConv').addEventListener('click', () => { S.settings.conv = !S.settings.conv; changed(true); });
   $('#swMissing').addEventListener('click', () => { S.settings.missing = !S.settings.missing; changed(true); });
+  $('#swPct').addEventListener('click', () => { S.settings.pct = !S.settings.pct; changed(true); });
   $('#swAdaptive').addEventListener('click', () => { S.settings.adaptive = !S.settings.adaptive; S.win = []; changed(false); });
   $('#swHard').addEventListener('click', () => { S.settings.hard = !S.settings.hard; changed(false); });
   $('#levelSeg').addEventListener('click', e => { const b = e.target.closest('[data-level]'); if (!b) return; S.settings.level = +b.dataset.level; changed(true); });

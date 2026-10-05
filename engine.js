@@ -1065,6 +1065,253 @@ tpl('frac.toFrac', 'conv.frac', 'Decimal to fraction', [2, 2, 2], L => {
     tip: 'Multiples of 0.125 are eighths, of 0.05 are twentieths, and of 0.04 are twenty-fifths.' });
 }, { nonStandard: true });
 
+// ================================================================ percentages
+// A percent Num shows as "15%" but carries its true value (0.15), so steps like 15% × 280 = 42 check exactly.
+// Question shapes, asked in every direction like the trading-firm tests:
+//   15% of 280 = ?      30.6 is ?% of 60      42 is 15% of ?      240 up 15% = ?      80 down ?% = 64      3/8 = ?%      45% = ?
+function rv(x) { return typeof x === 'number' ? R(x) : typeof x === 'string' ? parseDecimal(x) : x; }
+function P(x) { const r = rv(x); if (!r || decPlaces(r) < 0) throw new Error('P: bad percent'); return { v: Q.div(r, R(100)), k: 'pct', p: r }; }
+const PCT_FRAC = { '50': [1, 2], '25': [1, 4], '75': [3, 4], '20': [1, 5], '40': [2, 5], '60': [3, 5], '80': [4, 5], '12.5': [1, 8], '37.5': [3, 8], '62.5': [5, 8], '87.5': [7, 8] };
+const tenNote = () => T`${P(10)}: move the point one place left`;
+const oneNote = () => T`${P(1)}: move the point two places left`;
+// p a multiple of 10: find 10%, then scale
+function pctTen(p, N) {
+  const k = p / 10, ten = Q.div(N, R(10)), val = Q.mul(ten, R(k));
+  const steps = [{ chain: [E(W(N), '÷', 10), W(ten)], note: tenNote() }];
+  if (k > 1) steps.push({ chain: [E(W(ten), '×', k), W(val)], note: T`${P(p)} is ${k} lots of ${P(10)}` });
+  return { steps, val };
+}
+// a small whole percent: find 1%, then scale
+function pctOne(p, N) {
+  const one = Q.div(N, R(100)), val = Q.mul(one, R(p));
+  const steps = [{ chain: [E(W(N), '÷', 100), W(one)], note: oneNote() }];
+  if (p > 1) steps.push({ chain: [E(W(one), '×', p), W(val)], note: T`${P(p)} is ${p} lots of ${P(1)}` });
+  return { steps, val };
+}
+// a percent that is a simple fraction: divide by the bottom, times the top
+function pctFrac(key, N) {
+  const [n, d] = PCT_FRAC[key], part = Q.div(N, R(d)), val = Q.mul(part, R(n));
+  const steps = [{ text: T`${P(key)} is ${F(n, d)}`, checks: [[P(key), F(n, d)]] },
+    { chain: [E(W(N), '÷', d), W(part)], note: n > 1 ? 'Divide by the bottom' : T`Divide by ${d}` }];
+  if (n > 1) steps.push({ chain: [E(W(part), '×', n), W(val)], note: 'Times the top' });
+  return { steps, val };
+}
+// p = base ± d, with base 0, a multiple of 10, 50 or 100 and d small: build it from easy pieces
+function pctSplit(p, base, d, sign, N) {
+  const steps = [];
+  let ten = null, baseVal = null;
+  const getTen = () => { if (!ten) { ten = Q.div(N, R(10)); steps.push({ chain: [E(W(N), '÷', 10), W(ten)], note: tenNote() }); } return ten; };
+  if (base === 50) { baseVal = Q.div(N, R(2)); steps.push({ chain: [E(W(N), '÷', 2), W(baseVal)], note: T`${P(50)} is half` }); }
+  else if (base === 100) baseVal = N;
+  else if (base > 0) {
+    const k = base / 10; getTen(); baseVal = Q.mul(ten, R(k));
+    if (k > 1) steps.push({ chain: [E(W(ten), '×', k), W(baseVal)], note: T`${P(base)} is ${k} lots of ${P(10)}` });
+  }
+  let piece;
+  if (d === 5) { getTen(); piece = Q.div(ten, R(2)); steps.push({ chain: [E(W(ten), '÷', 2), W(piece)], note: T`${P(5)} is half of ${P(10)}` }); }
+  else {
+    const one = Q.div(N, R(100)); piece = one;
+    steps.push({ chain: [E(W(N), '÷', 100), W(one)], note: oneNote() });
+    if (d > 1) { piece = Q.mul(one, R(d)); steps.push({ chain: [E(W(one), '×', d), W(piece)], note: T`${P(d)} is ${d} lots of ${P(1)}` }); }
+  }
+  if (!baseVal) return { steps, val: piece };
+  const op = sign > 0 ? '+' : '−', val = sign > 0 ? Q.add(baseVal, piece) : Q.sub(baseVal, piece);
+  steps.push({ chain: [E(W(baseVal), op, W(piece)), W(val)], note: T`${P(p)} = ${P(base)} ${op} ${P(d)}`, checks: [[E(P(base), op, P(d)), P(p)]] });
+  return { steps, val };
+}
+// [percent, base, piece, sign]
+const SPLIT = {
+  1: [[15, 10, 5, 1], [5, 0, 5, 1]],
+  2: [[15, 10, 5, 1], [35, 30, 5, 1], [45, 50, 5, -1], [55, 50, 5, 1], [65, 60, 5, 1], [85, 80, 5, 1], [95, 100, 5, -1], [11, 10, 1, 1], [12, 10, 2, 1],
+    [21, 20, 1, 1], [51, 50, 1, 1], [49, 50, 1, -1], [99, 100, 1, -1], [9, 10, 1, -1], [19, 20, 1, -1], [31, 30, 1, 1], [52, 50, 2, 1], [48, 50, 2, -1], [98, 100, 2, -1]],
+  3: [[13, 10, 3, 1], [17, 20, 3, -1], [23, 20, 3, 1], [27, 30, 3, -1], [33, 30, 3, 1], [43, 40, 3, 1], [47, 50, 3, -1], [53, 50, 3, 1], [57, 60, 3, -1], [97, 100, 3, -1],
+    [45, 50, 5, -1], [65, 60, 5, 1], [51, 50, 1, 1], [49, 50, 1, -1], [99, 100, 1, -1], [12, 10, 2, 1], [48, 50, 2, -1]],
+};
+const SPLIT_ALL = SPLIT[2].concat(SPLIT[3]);
+// best everyday method for p% of N (used inside up/down questions)
+function pctAuto(key, N) {
+  const pr = rv(key);
+  if (pr.d === 1 && pr.n % 10 === 0 && pr.n < 100 && pr.n !== 50) return pctTen(pr.n, N);
+  if (PCT_FRAC[key]) return pctFrac(key, N);
+  const sp = pr.d === 1 && SPLIT_ALL.find(c => c[0] === pr.n);
+  if (sp) return pctSplit(sp[0], sp[1], sp[2], sp[3], N);
+  if (pr.d === 1 && pr.n < 10) return pctOne(pr.n, N);
+  throw new Error('pctAuto: no method for ' + key);
+}
+function pctN(L, mult) {   // the "number" in p% of N: friendly at Foundations, anything at Test level, decimals when Hard
+  if (L === 1) return R(mult * ri(Math.ceil(20 / mult), Math.floor(600 / mult)));
+  if (L === 2) return chance(0.5) ? R(10 * ri(2, 60)) : R(ri(20, 600));
+  return chance(0.5) ? R(ri(40, 990)) : dv(ri(100, 9990), 1);
+}
+
+// ---------- p% of N
+tpl('pct.ofTen', 'pct.of', 'Find 10%, then scale up', [3, 2, 1.5], L => {
+  const p = 10 * pick(L === 1 ? [1, 2, 3, 4, 6, 7, 8, 9] : [2, 3, 4, 6, 7, 8, 9]), N = pctN(L, 10);
+  const { steps, val } = pctTen(p, N);
+  return mk({ q: [P(p), 'of', W(N), '=', '?'], ans: val, steps, tip: T`Every percent can start from ${P(10)}: move the point one place left, then scale.` });
+}, { nonStandard: true });
+tpl('pct.ofSplit', 'pct.of', 'Build it from easy pieces', [1.5, 3, 3], L => {
+  const [p, base, d, sign] = pick(SPLIT[L]), N = pctN(L, 20);
+  const { steps, val } = pctSplit(p, base, d, sign, N);
+  return mk({ q: [P(p), 'of', W(N), '=', '?'], ans: val, steps,
+    tip: T`${P(10)} is one place left, ${P(1)} is two places left and ${P(5)} is half of ${P(10)}. Add or take away the pieces.` });
+}, { nonStandard: true });
+tpl('pct.ofFrac', 'pct.of', 'Use the fraction it stands for', [3, 3, 2.5], L => {
+  const key = pick(L === 1 ? ['50', '25', '75', '20'] : ['25', '75', '20', '40', '60', '80', '12.5', '37.5', '62.5', '87.5']), d = PCT_FRAC[key][1];
+  const N = L === 3 ? R(ri(30, 600)) : R(d * ri(Math.max(2, Math.ceil(12 / d)), Math.floor((L === 1 ? 200 : 480) / d)));
+  const { steps, val } = pctFrac(key, N);
+  return mk({ q: [P(key), 'of', W(N), '=', '?'], ans: val, steps,
+    tip: T`Know these as fractions: ${P('12.5')} = ${F(1, 8)}, ${P(20)} = ${F(1, 5)}, ${P(25)} = ${F(1, 4)}, ${P('37.5')} = ${F(3, 8)}, ${P(75)} = ${F(3, 4)}.` });
+}, { nonStandard: true });
+tpl('pct.ofOne', 'pct.of', 'Find 1%, then scale up', [1.5, 1.5, 1.5], L => {
+  const p = pick(L === 1 ? [1, 2, 3, 4] : L === 2 ? [2, 3, 4, 6, 7, 8] : [3, 6, 7, 8, 9]);
+  const N = L === 1 ? R(100 * ri(1, 9)) : L === 2 ? (chance(0.6) ? R(10 * ri(2, 90)) : R(ri(20, 400))) : dv(ri(200, 9990), 1);
+  const { steps, val } = pctOne(p, N);
+  return mk({ q: [P(p), 'of', W(N), '=', '?'], ans: val, steps, tip: T`${P(1)} is the number with the point moved two places left. Then multiply.` });
+}, { nonStandard: true });
+tpl('pct.ofSwap', 'pct.of', 'Swap them round', [0, 1.5, 1.5], L => {
+  const N = pick([25, 50, 75, 20]), key = String(N), d = PCT_FRAC[key][1];
+  const p = L === 2 ? d * ri(2, Math.floor(98 / d)) : ri(4, 98);
+  need(p % 10 !== 0 && !PCT_FRAC[String(p)] && p !== N);
+  const f = pctFrac(key, R(p));
+  const steps = [{ text: T`${P(p)} of ${N} is the same as ${P(N)} of ${p}`, checks: [[E(P(p), '×', N), E(P(N), '×', p)]] }].concat(f.steps);
+  return mk({ q: [P(p), 'of', I(N), '=', '?'], ans: f.val, steps, tip: T`${P(8)} of ${25} is ${P(25)} of ${8}. Swap them when the other way round is friendlier.` });
+}, { nonStandard: true });
+
+// ---------- what percent, and the whole
+tpl('pct.whatFrac', 'pct.what', 'Part over whole, times 100', [3, 3, 3], L => {
+  const key = pick({ 1: ['10', '20', '25', '50', '75', '30', '40', '60', '80', '5'],
+    2: ['15', '35', '45', '12.5', '37.5', '62.5', '4', '8', '12', '16', '24', '32', '36', '44', '65', '85', '2.5', '7.5'],
+    3: ['17.5', '22.5', '6.25', '18.75', '87.5', '3', '6', '14', '26', '34', '46', '58', '66', '120', '140', '175'] }[L]);
+  const pr = rv(key), fr = Q.div(pr, R(100)), m = ri(2, Math.floor((L === 1 ? 200 : L === 2 ? 480 : 960) / fr.d));
+  const A = fr.n * m, B = fr.d * m;
+  need(B !== 100);
+  const steps = [{ chain: [F(A, B), F(fr.n, fr.d)], note: 'Part over whole, then simplify' },
+    { chain: [E(F(fr.n, fr.d), '×', 100), W(pr)], note: 'Times 100 turns it into a percent' }];
+  return mk({ q: [I(A), 'is', '?', '%', 'of', I(B)], ans: pr, ansNum: Dv(pr), steps,
+    tip: T`What percent = part ÷ whole × 100. Simplify first: ${F(36, 240)} = ${F(3, 20)}, and ${F(3, 20)} × 100 = ${15}.` });
+}, { nonStandard: true });
+tpl('pct.whatTen', 'pct.what', 'Count the 10%s', [2, 2, 1.5], L => {
+  const kr = L === 1 ? R(ri(1, 9)) : L === 2 ? pick([R(3, 2), R(5, 2), R(7, 2), R(9, 2), R(13, 2), R(2), R(3), R(4), R(6), R(7), R(8), R(9)]) : pick([R(12), R(15), R(35, 2), R(11, 2), R(15, 2), R(17, 2), R(13), R(14)]);
+  const B = L === 1 ? 10 * ri(2, 30) : L === 2 ? 20 * ri(1, 25) : 10 * ri(2, 60);
+  const ten = R(B / 10), A = Q.mul(ten, kr), pr = Q.mul(kr, R(10));
+  need(B !== 100 && decPlaces(A) >= 0 && decPlaces(A) <= 2);
+  const steps = [{ chain: [E(B, '÷', 10), W(ten)], note: T`${P(10)} of ${B}` },
+    { chain: [E(W(A), '÷', W(ten)), W(kr)], note: T`How many ${W(ten)}s make ${W(A)}?` },
+    { chain: [E(W(kr), '×', 10), W(pr)], note: T`Each one is ${P(10)}` }];
+  return mk({ q: [W(A), 'is', '?', '%', 'of', I(B)], ans: pr, ansNum: Dv(pr), steps, tip: T`Find ${P(10)} of the whole, then count how many of those fit into the part.` });
+}, { nonStandard: true });
+tpl('pct.whatOne', 'pct.what', 'Count the 1%s', [0, 2, 2], L => {
+  const B = L === 2 ? pick([50, 60, 80, 120, 150, 200, 250, 300, 400, 500, 600, 800]) : 10 * ri(3, 90);
+  const p = L === 2 ? ri(2, 98) : ri(101, 180);
+  need(p % 10 !== 0);
+  const one = R(B, 100), A = Q.mul(one, R(p)), k = Math.max(decPlaces(one), decPlaces(A)), s = 10 ** k;
+  const chain = [E(W(A), '÷', W(one))];
+  if (k > 0) chain.push(E(W(Q.mul(A, R(s))), '÷', W(Q.mul(one, R(s)))));
+  chain.push(I(p));
+  const steps = [{ chain: [E(B, '÷', 100), W(one)], note: T`${P(1)} of ${B}: move the point two places left` },
+    { chain, note: T`How many ${W(one)}s make ${W(A)}?` }];
+  return mk({ q: [W(A), 'is', '?', '%', 'of', I(B)], ans: R(p), ansNum: I(p), steps, tip: T`Find ${P(1)} of the whole, then count how many of those make the part.` });
+}, { nonStandard: true });
+tpl('pct.whole', 'pct.what', 'Work back to 100%', [2, 2.5, 2.5], L => {
+  const key = pick({ 1: ['10', '20', '25', '50'], 2: ['5', '15', '30', '40', '75', '12.5', '35', '60', '45'],
+    3: ['12', '35', '45', '62.5', '2.5', '17.5', '24', '65', '37.5', '120', '150'] }[L]);
+  const pr = rv(key), fr = Q.div(pr, R(100)), u = R(100, fr.d);
+  const m = ri(2, Math.floor((L === 1 ? 200 : L === 2 ? 600 : 1200) / fr.d)), A = fr.n * m, B = fr.d * m;
+  const steps = [];
+  if (fr.n > 1) steps.push({ chain: [E(A, '÷', fr.n), m], note: T`${P(key)} is ${fr.n} lots of ${P(u)}, so ${P(u)} is`, checks: [[E(fr.n, '×', P(u)), P(key)]] });
+  steps.push({ chain: [E(m, '×', fr.d), B], note: T`${P(100)} is ${fr.d} lots of ${P(u)}`, checks: [[E(fr.d, '×', P(u)), P(100)]] });
+  return mk({ q: [I(A), 'is', P(key), 'of', '?'], ans: R(B), steps,
+    tip: T`Find a small slice, then build back up to ${P(100)}. If ${P(15)} is ${42}, then ${P(5)} is ${14} and ${P(100)} is ${280}.` });
+}, { nonStandard: true });
+
+// ---------- going up or down by a percent
+const CHG_POOL = { 1: ['10', '20', '50', '25', '5'], 2: ['15', '30', '40', '12', '35', '75', '60', '5', '8', '45'], 3: ['12.5', '37.5', '17', '23', '45', '65', '33', '62.5'] };
+function chgN(L) { return L === 1 ? R(20 * ri(2, 25)) : L === 2 ? (chance(0.8) ? R(10 * ri(2, 60)) : R(ri(20, 99))) : R(ri(20, 900)); }
+tpl('pct.up', 'pct.chg', 'Work out the increase, then add it on', [3, 3, 3], L => {
+  const key = pick(CHG_POOL[L]), pr = rv(key), N = chgN(L);
+  const { steps, val } = pctAuto(key, N), total = Q.add(N, val);
+  steps.push({ chain: [E(W(N), '+', W(val)), W(total)], note: 'Add it on' });
+  need(steps.length <= 6);
+  return mk({ q: [W(N), 'up', P(key), '=', '?'], ans: total, steps,
+    tip: T`Work out the percent of the starting number, then add it on. Up ${P(key)} is the same as × ${W(Q.add(R(1), Q.div(pr, R(100))))}.` });
+}, { nonStandard: true });
+tpl('pct.down', 'pct.chg', 'Work out the drop, then take it off', [3, 3, 3], L => {
+  const key = pick(CHG_POOL[L]), pr = rv(key), N = chgN(L);
+  const { steps, val } = pctAuto(key, N), total = Q.sub(N, val);
+  steps.push({ chain: [E(W(N), '−', W(val)), W(total)], note: 'Take it off' });
+  need(steps.length <= 6);
+  return mk({ q: [W(N), 'down', P(key), '=', '?'], ans: total, steps,
+    tip: T`Work out the percent of the starting number, then take it off. Down ${P(key)} is the same as × ${W(Q.sub(R(1), Q.div(pr, R(100))))}.` });
+}, { nonStandard: true });
+tpl('pct.keep', 'pct.chg', 'Keep what is left', [1, 1.5, 1.5], L => {
+  const key = pick({ 1: ['50', '25', '20'], 2: ['25', '20', '60', '40', '75', '12.5', '50'], 3: ['12.5', '37.5', '62.5', '87.5', '75', '60'] }[L]);
+  const left = decStr(Q.sub(R(100), rv(key)));
+  need(!!PCT_FRAC[left]);
+  const d = PCT_FRAC[left][1], N = L === 3 ? R(ri(20, 600)) : R(d * ri(Math.max(2, Math.ceil(12 / d)), Math.floor((L === 1 ? 200 : 480) / d)));
+  const f = pctFrac(left, N);
+  const steps = [{ text: T`Down ${P(key)} leaves ${P(left)}`, checks: [[E(P(100), '−', P(key)), P(left)]] }].concat(f.steps);
+  return mk({ q: [W(N), 'down', P(key), '=', '?'], ans: f.val, steps, tip: T`Going down ${P(key)} leaves ${P(left)}, so work out ${P(left)} of it straight away.` });
+}, { nonStandard: true });
+tpl('pct.chgWhat', 'pct.chg', 'Change over the start, times 100', [1, 2.5, 2.5], L => {
+  const up = chance(0.55), key = pick({ 1: ['10', '20', '25', '50'], 2: ['5', '15', '30', '40', '12', '35', '8', '75', '60', '45'], 3: ['12.5', '2.5', '7.5', '17.5', '45', '65', '22', '37.5'] }[L]);
+  const pr = rv(key), fr = Q.div(pr, R(100));
+  const m = ri(2, Math.floor((L === 1 ? 200 : L === 2 ? 500 : 900) / fr.d)), N = fr.d * m, ch = fr.n * m, M = up ? N + ch : N - ch;
+  need(M > 0);
+  const steps = [{ chain: [up ? E(M, '−', N) : E(N, '−', M), ch], note: up ? 'How much it went up' : 'How much it went down' },
+    { chain: [F(ch, N), F(fr.n, fr.d)], note: 'Change over the start, then simplify' },
+    { chain: [E(F(fr.n, fr.d), '×', 100), W(pr)], note: 'Times 100 gives the percent' }];
+  return mk({ q: [I(N), up ? 'up' : 'down', '?', '%', '=', I(M)], ans: pr, ansNum: Dv(pr), steps,
+    tip: 'Percent change = change ÷ starting number × 100. Always divide by where it started.' });
+}, { nonStandard: true });
+
+// ---------- converting
+const PCT_DEN = { 1: [2, 4, 5, 10, 20, 25, 50], 2: [4, 5, 8, 20, 25, 40, 50], 3: [8, 16, 40, 80, 200] };
+const PCT_ANCHOR = { 8: '12.5', 16: '6.25', 40: '2.5', 80: '1.25', 200: '0.5' };
+tpl('pct.fromFrac', 'pct.conv', 'Fraction to percent', [3, 3, 3], L => {
+  const d = pick(PCT_DEN[L]);
+  let n = properNum(d);
+  if (L === 3 && chance(0.3)) n += d;
+  const pct = Q.mul(R(n, d), R(100)), steps = [];
+  if (PCT_ANCHOR[d]) {
+    steps.push({ chain: [E(n, '×', W(rv(PCT_ANCHOR[d]))), W(pct)], note: T`${F(1, d)} is ${P(PCT_ANCHOR[d])}, and this is ${n} of them`, checks: [[F(1, d), P(PCT_ANCHOR[d])]] });
+  } else {
+    const k = 100 / d;
+    steps.push({ chain: [F(n, d), F(n * k, 100)], note: T`Get the bottom to ${100} (× ${k})` });
+    steps.push({ chain: [E(F(n * k, 100), '×', 100), W(pct)], note: 'Out of 100 is the percent' });
+  }
+  return mk({ q: [F(n, d), '=', '?', '%'], x: F(n, d), ans: pct, ansNum: Dv(pct), steps,
+    tip: T`Anchors worth knowing: ${F(1, 8)} = ${P('12.5')}, ${F(1, 20)} = ${P(5)}, ${F(1, 25)} = ${P(4)}, ${F(1, 40)} = ${P('2.5')}.` });
+}, { nonStandard: true });
+tpl('pct.fromDec', 'pct.conv', 'Decimal to percent', [2, 2, 2], L => {
+  const x = L === 1 ? dv(ri(1, 99), 2) : L === 2 ? dv(ri(1, 999), 3) : chance(0.5) ? dv(ri(1001, 4000), 3) : dv(ri(1, 999), 4);
+  if (L === 2) need(decPlaces(x) === 3);
+  if (L === 3) need(decPlaces(x) >= 2);
+  const pct = Q.mul(x, R(100));
+  return mk({ q: [W(x), '=', '?', '%'], x: W(x), ans: pct, ansNum: Dv(pct), steps: [{ chain: [E(W(x), '×', 100), W(pct)], note: 'Move the point two places right' }],
+    tip: 'Decimal to percent: move the point two places right. Percent to decimal: two places left.' });
+}, { nonStandard: true });
+tpl('pct.toFrac', 'pct.conv', 'Percent to fraction', [2, 2, 2], L => {
+  const key = pick({ 1: ['5', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55', '60', '65', '70', '75', '80', '85', '90', '95'],
+    2: ['12.5', '37.5', '62.5', '87.5', '2.5', '7.5', '4', '8', '12', '16', '24', '28', '32', '36', '44', '48', '52', '56', '64', '68', '72', '76', '84', '88', '92', '96'],
+    3: ['6.25', '18.75', '31.25', '0.5', '1.5', '17.5', '22.5', '125', '175', '120', '140', '160', '250'] }[L]);
+  const pr = rv(key), v = Q.div(pr, R(100));
+  need(v.d > 1);
+  const k = decPlaces(pr), s = 10 ** k, top = pr.n * (s / pr.d), bot = 100 * s, chain = [P(key), F(top, bot)];
+  if (gcd(top, bot) > 1) chain.push(Fr(v));
+  return mk({ q: [P(key), '=', '?'], x: P(key), ans: v, ansNum: Fr(v), form: 'fracSimplest',
+    steps: [{ chain, note: k ? 'Over 100, clear the decimal, then simplify' : gcd(top, bot) > 1 ? 'Over 100, then simplify' : 'Over 100' }],
+    tip: T`Percent to fraction: put it over ${100} and simplify. ${P('12.5')} = ${F(1, 8)}, ${P(20)} = ${F(1, 5)}, ${P(75)} = ${F(3, 4)}.` });
+}, { nonStandard: true });
+tpl('pct.toDec', 'pct.conv', 'Percent to decimal', [1.5, 1.5, 1.5], L => {
+  const pr = L === 1 ? R(ri(1, 99)) : L === 2 ? dv(ri(1, 199), 1) : chance(0.5) ? dv(ri(1001, 3000), 1) : dv(ri(1, 99), 2);
+  if (L === 2) need(decPlaces(pr) === 1);
+  const v = Q.div(pr, R(100));
+  need(v.d > 1);
+  return mk({ q: [P(pr), '=', '?'], x: P(pr), ans: v, ansNum: Dv(v), form: 'dec', steps: [{ chain: [P(pr), E(W(pr), '÷', 100), Dv(v)], note: 'Move the point two places left' }],
+    tip: T`Percent to decimal: move the point two places left. ${P('7.5')} = ${Dv('0.075')}.` });
+}, { nonStandard: true });
+
 // ================================================================ missing-number questions
 // presented op → wrapper kinds; each wrapper reuses an "inner" problem whose answer is the missing number.
 const WRAPS = { add: ['add?', '?add'], sub: ['sub?', '?sub'], mul: ['mul?', '?mul'], div: ['div?', '?div'] };
@@ -1154,6 +1401,7 @@ function withCommas(s) { const neg = s[0] === '-'; if (neg) s = s.slice(1); cons
 function numText(x) {
   if (x.k === 'int') return withCommas(String(x.v.n));
   if (x.k === 'dec') return withCommas(decStr(x.v));
+  if (x.k === 'pct') return withCommas(decStr(x.p)) + '%';
   return x.d === 1 ? String(x.n) : x.n + '/' + x.d;
 }
 function needsParens(child, parentOp, isRight) {
@@ -1179,7 +1427,7 @@ function plainProblem(p) {
   return plainTokens(p.q) + '   [answer ' + numText(p.ansNum) + ']\n  ' + lines.join('\n  ');
 }
 
-const API = { seed, R, Q, ev, decStr, decPlaces, parseDecimal, TPL, CELL_LABEL, TYPE_LABEL, WRAPS, WRAP_INNER,
+const API = { seed, R, Q, ev, P, decStr, decPlaces, parseDecimal, TPL, CELL_LABEL, TYPE_LABEL, WRAPS, WRAP_INNER,
   templatesFor, generate, similar, genTpl, wrapMissing, fromCell, parseInput, checkInput,
   numText, exprText, partsText, plainTokens, plainProblem, parts, withCommas, PREC, needsParens };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.MM = API;

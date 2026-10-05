@@ -10,8 +10,8 @@
 <meta property="og:title" content="Six Second Math">
 <meta property="og:description" content="Get to six seconds a question on +, −, ×, ÷, decimals and fractions. Miss one and see how to break it down in your head.">
 <meta property="og:type" content="website">
-<link rel="icon" href="icon.svg?v=51f34a56" type="image/svg+xml">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=51f34a56">
+<link rel="icon" href="icon.svg?v=1b0a43ce" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=1b0a43ce">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500;600;700&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
@@ -136,6 +136,8 @@ button:focus-visible, [tabindex]:focus-visible, summary:focus-visible { outline:
 .problem { margin-top: 10px; text-align: center; font-family: var(--font-num); font-weight: 500; font-size: 52px; line-height: 1.2; min-height: 1.5em; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .pline { display: inline-flex; align-items: center; white-space: nowrap; letter-spacing: -0.015em; }
 .op { padding: 0 0.26em; color: var(--ink-2); font-weight: 400; }
+.op.wd, .o.wd { font-family: var(--font-ui); font-size: 0.6em; font-weight: 500; padding: 0 0.42em; letter-spacing: 0; }
+.pc { color: var(--ink); padding-left: 0.04em; }
 .fr { display: inline-flex; flex-direction: column; align-items: stretch; vertical-align: middle; font-size: 0.6em; line-height: 1.08; text-align: center; margin: 0 0.04em; }
 .fr .fn { border-bottom: 0.075em solid currentColor; padding: 0 0.14em 0.04em; }
 .fr .fd { padding: 0.04em 0.14em 0; }
@@ -592,6 +594,7 @@ table.hist td.num, table.hist th.num { text-align: right; font-family: var(--fon
       </div>
       <div class="group">
         <div class="switch-row"><div><div class="t">Fraction and decimal conversions</div><div class="d">Questions like 3/8 = ? and 0.35 = ?. Needs fractions on.</div></div><button type="button" class="switch" role="switch" id="swConv" aria-label="Fraction and decimal conversions"></button></div>
+        <div class="switch-row"><div><div class="t">Percentages</div><div class="d">Questions like 15% of 280, 36 is ?% of 240, 80 up 15% and 3/8 = ?%.</div></div><button type="button" class="switch" role="switch" id="swPct" aria-label="Percentages"></button></div>
         <div class="switch-row"><div><div class="t">Missing-number questions</div><div class="d">Some questions come as 66 × ? = 138.6, like the real tests.</div></div><button type="button" class="switch" role="switch" id="swMissing" aria-label="Missing-number questions"></button></div>
       </div>
       <div class="group">
@@ -623,9 +626,9 @@ table.hist td.num, table.hist th.num { text-align: right; font-family: var(--fon
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </div>
 
-<script src="config.js?v=51f34a56"></script>
-<script src="cloud.js?v=51f34a56"></script>
-<script src="engine.js?v=51f34a56"></script>
-<script src="app.js?v=51f34a56"></script>
+<script src="config.js?v=1b0a43ce"></script>
+<script src="cloud.js?v=1b0a43ce"></script>
+<script src="engine.js?v=1b0a43ce"></script>
+<script src="app.js?v=1b0a43ce"></script>
 </body>
 </html>
